@@ -68,8 +68,9 @@ export function DayDetail({ day }) {
           <div className="flex justify-between py-2.5"><dt className="text-muted">Status</dt><dd className={clsx('font-bold', TONE[meta.tone].text)}>{meta.label}</dd></div>
           {r.note && <div className="flex justify-between gap-4 py-2.5"><dt className="text-muted">Reason</dt><dd className="text-right font-semibold">{r.note}</dd></div>}
           {r.overrideLeave && <div className="py-2.5 text-xs font-semibold text-warning">Clocked in over approved leave</div>}
+          {r.autoPresent && <div className="py-2.5 text-xs font-semibold text-success">Marked present automatically: 3 hours or more of overtime.</div>}
           {r.autoClosed && <div className="py-2.5 text-xs font-semibold text-muted">Clock-out was missed, closed automatically at shift end</div>}
-          {r.status === 'OVERTIME' && <div className="py-2.5 text-xs font-semibold text-success/80">No main-shift clock-in. Counted as present because of overtime work. This doesn’t change attendance or performance numbers.</div>}
+          {r.status === 'OVERTIME' && <div className="py-2.5 text-xs font-semibold text-success/80">No main-shift clock-in and under 3 hours of overtime, so this is shown as overtime only. It doesn’t change attendance or performance numbers. 3 hours or more makes the day present.</div>}
         </dl>
       )}
       {r?.overtime?.length > 0 && (

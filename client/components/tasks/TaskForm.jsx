@@ -17,7 +17,7 @@ const schema = z
   .object({
     title: z.string().trim().min(2, 'Give the task a title.').max(140, 'Keep the title under 140 characters.'),
     description: z.string().max(2000).optional(),
-    assignedTo: z.string().min(1, 'Choose who this is for.'),
+    assignedTo: z.array(z.string()).min(1, 'Choose at least one person.'),
     projectId: z.string().optional(),
     priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
     deadlineType: z.enum(['hours', 'days', 'custom']),
@@ -34,6 +34,9 @@ const schema = z
     }
   });
 
+// Adds the person to the selection, or removes them if they were already picked.
+const picked_ = (list, id) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+
 const HOUR_CHIPS = [1, 2, 4, 8, 12, 24];
 const DAY_CHIPS = [1, 2, 3, 5, 7, 14];
 
@@ -42,12 +45,12 @@ export default function TaskForm({ defaults, onDone, onCancel }) {
   const { data: users = [] } = useUsers();
   const { data: allProjects = [] } = useProjects();
   const now = useServerNow();
-  const create = useAction((body) => api('/tasks', { method: 'POST', body }).then((d) => d.task), { success: 'Task created — the countdown has started.', sound: 'create' });
+  const create = useAction((body) => api('/tasks', { method: 'POST', body }), { success: (d) => (d.tasks?.length > 1 ? `${d.tasks.length} tasks created — one for each person.` : 'Task created — the countdown has started.'), sound: 'create' });
 
   const { register, handleSubmit, watch, setValue, setError, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
-      title: defaults?.title || '', description: '', assignedTo: defaults?.assignedTo || user?._id || '', projectId: defaults?.projectId || '', priority: 'MEDIUM',
+      title: defaults?.title || '', description: '', assignedTo: [].concat(defaults?.assignedTo || user?._id || []), projectId: defaults?.projectId || '', priority: 'MEDIUM',
       deadlineType: 'hours', hours: 2, days: 1, customAt: toLocalInput(new Date(Date.now() + 24 * 3600_000)),
     },
   });
@@ -72,8 +75,8 @@ export default function TaskForm({ defaults, onDone, onCancel }) {
         : values.deadlineType === 'days' ? { type: 'days', value: values.days }
           : { type: 'custom', at: new Date(values.customAt).toISOString() };
     try {
-      const task = await create.mutateAsync({ title: values.title, description: values.description || '', assignedTo: values.assignedTo, projectId: values.projectId || null, priority: values.priority, deadline });
-      onDone?.(task);
+      const res = await create.mutateAsync({ title: values.title, description: values.description || '', assignedTo: values.assignedTo, projectId: values.projectId || null, priority: values.priority, deadline });
+      onDone?.(res.tasks?.length > 1 ? { tasks: res.tasks } : res.task); // several tasks: no single page to open
     } catch (err) {
       if (err.fields?.title) setError('title', { message: err.fields.title });
     }
@@ -106,14 +109,14 @@ export default function TaskForm({ defaults, onDone, onCancel }) {
         )}
       </Field>
 
-      <Field label="Assign to" error={errors.assignedTo?.message}>
+      <Field label="Assign to" error={errors.assignedTo?.message} hint={v.assignedTo.length > 1 ? `${v.assignedTo.length} people — each gets their own task` : 'Pick one or more people'}>
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
           {users.map((u) => (
-            <button key={u._id} type="button" onClick={() => setValue('assignedTo', u._id, { shouldValidate: true })}
-              className={clsx('flex items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition', v.assignedTo === u._id ? 'border-accent bg-accent/10 shadow-glow' : 'border-line bg-surface-2 hover:border-accent/40')}>
+            <button key={u._id} type="button" onClick={() => setValue('assignedTo', picked_(v.assignedTo, u._id), { shouldValidate: true })}
+              className={clsx('flex items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition', v.assignedTo.includes(u._id) ? 'border-accent bg-accent/10 shadow-glow' : 'border-line bg-surface-2 hover:border-accent/40')}>
               <Avatar user={u} size="sm" />
               <span className="min-w-0"><span className="block truncate text-sm font-bold">{u.name}</span>{u._id === user?._id && <span className="text-[11px] text-muted">You</span>}</span>
-              {v.assignedTo === u._id && <Icon name="check" className="ml-auto h-4 w-4 text-accent" />}
+              {v.assignedTo.includes(u._id) && <Icon name="check" className="ml-auto h-4 w-4 text-accent" />}
             </button>
           ))}
         </div>
@@ -176,7 +179,7 @@ export default function TaskForm({ defaults, onDone, onCancel }) {
       <div className="flex items-center justify-end gap-3 border-t border-line pt-5">
         {onCancel && <button type="button" className="btn-ghost" onClick={onCancel}>Cancel</button>}
         <button type="submit" className="btn-primary min-w-36" disabled={create.isPending}>
-          {create.isPending ? <><Spinner />Creating task…</> : <><Icon name="plus" />Create task</>}
+          {create.isPending ? <><Spinner />Creating task…</> : <><Icon name="plus" />{v.assignedTo.length > 1 ? `Create ${v.assignedTo.length} tasks` : 'Create task'}</>}
         </button>
       </div>
     </form>

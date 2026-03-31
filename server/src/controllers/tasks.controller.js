@@ -93,8 +93,9 @@ exports.get = asyncHandler(async (req, res) => {
 
 exports.create = asyncHandler(async (req, res) => {
   const input = v.createTask.parse(req.body);
-  const task = await svc.createTask(req.user, input);
-  ok(res, { task: await one(task._id, req.user) }, 201);
+  const created = await svc.createTasks(req.user, input);
+  const tasks = await Promise.all(created.map((t) => one(t._id, req.user)));
+  ok(res, { task: tasks[0], tasks }, 201);
 });
 
 exports.update = asyncHandler(async (req, res) => {

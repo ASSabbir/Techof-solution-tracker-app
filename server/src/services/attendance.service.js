@@ -17,13 +17,15 @@ function stateOf(rec) {
   if (!rec) return 'NOT_STARTED';
   if (rec.entryTime && !rec.exitTime) return 'WORKING';
   if (rec.entryTime && rec.exitTime) return 'COMPLETED';
-  return rec.status; // LEAVE / ABSENT / OVERTIME
+  return rec.status; // LEAVE / ABSENT / OVERTIME / PRESENT (made present by overtime)
 }
 
 // Forgotten clock-outs are closed automatically:
 //  - main shift: 5 hours after the shift ends, recorded as if they left at shift end
 //  - overtime session: 5 hours after it started, recorded as a 5 hour session
 const LIMIT_MS = 5 * HOUR;
+// Overtime credited to one date: this much or more makes the date an official PRESENT, less stays "overtime present".
+const OVERTIME_PRESENT_MINUTES = 3 * 60;
 
 /* Every unfinished session of one person: the main shift and/or overtime sessions. */
 async function openSessions(userId) {
@@ -37,6 +39,15 @@ async function openSessions(userId) {
     for (const s of rec.overtime || []) if (!s.exitTime) out.push({ kind: 'OVERTIME', rec, session: s, entryTime: s.entryTime });
   }
   return out.sort((a, b) => b.entryTime - a.entryTime);
+}
+
+/* 3+ hours of overtime for a date make it an official PRESENT automatically, so nobody has to clock out and in again at shift start. */
+async function promoteIfDue(rec, extraMinutes = 0) {
+  if (!rec || rec.status !== 'OVERTIME' || rec.entryTime) return rec;
+  if ((rec.overtimeMinutes || 0) + extraMinutes < OVERTIME_PRESENT_MINUTES) return rec;
+  const upd = await Attendance.findOneAndUpdate({ _id: rec._id, status: 'OVERTIME', entryTime: null }, { $set: { status: 'PRESENT', autoPresent: true } }, { new: true });
+  if (upd) await activity.log(rec.userId, 'ATTENDANCE_AUTO_PRESENT', 'Attendance', rec._id, 'Marked present automatically after 3+ hours of overtime', { date: rec.date });
+  return upd || rec;
 }
 
 async function closeStale(user, settings, now = new Date()) {
@@ -58,6 +69,7 @@ async function closeStale(user, settings, now = new Date()) {
       );
       if (upd) await activity.log(user._id, 'CLOCK_OUT_AUTO', 'Attendance', o.rec._id, `${user.name || 'Someone'} forgot to clock out — closed at shift end`, { date: o.rec.date, workingMinutes: minutes });
     } else {
+      await promoteIfDue(o.rec, Math.floor(Math.min(now.getTime() - entry, LIMIT_MS) / 60000)); // a running session counts too
       if (now.getTime() < entry + LIMIT_MS) continue;
       const minutes = Math.round(LIMIT_MS / 60000);
       const upd = await Attendance.findOneAndUpdate(
@@ -108,7 +120,8 @@ async function clockIn(user, { override = false } = {}) {
   const existing = win ? await Attendance.findOne({ userId: user._id, date: win.date }) : null;
 
   // Anything outside the main shift (or after the main shift is already done) is overtime.
-  if (!win || (existing && existing.entryTime)) return startOvertime(user, now, shift, tz);
+  // (A date already made present by overtime has no main clock-in to make, so more work is just more overtime.)
+  if (!win || (existing && (existing.entryTime || existing.autoPresent))) return startOvertime(user, now, shift, tz);
 
   const key = win.date; // the date the shift STARTED on (matters for overnight shifts)
   const late = T.isWorkingDay(key, settings) && now.getTime() > win.startUtc.getTime() + settings.lateGraceMinutes * 60_000;
@@ -182,7 +195,7 @@ async function clockOut(user, summary = '') {
   );
   if (!rec) throw new AppError('You’ve already clocked out.', 409, 'ALREADY_CLOCKED_OUT');
   await activity.log(user._id, 'CLOCK_OUT', 'Attendance', rec._id, `${user.name} finished overtime`, { date: rec.date, overtime: true, minutes, hasSummary: !!summary });
-  return rec;
+  return promoteIfDue(rec);
 }
 
 async function today(user) {
@@ -206,7 +219,7 @@ async function today(user) {
 
   const open = (await openSessions(user._id))[0] || null;
   const show = win || S.upcomingWindow(now, shift, settings);
-  const mainDone = !!(rec && rec.entryTime);
+  const mainDone = !!(rec && (rec.entryTime || rec.autoPresent));
   // Clocking in is always possible. Inside the shift (and before the main clock-in) it is the main shift, otherwise overtime.
   const mode = win && !mainDone ? 'MAIN' : 'OVERTIME';
 
@@ -254,7 +267,7 @@ function computeStats(records) {
     if (r.overtimeMinutes > 0 || r.status === 'OVERTIME') overtimeDays++;
     overtimeMinutes += r.overtimeMinutes || 0;
   }
-  // "Overtime present" days are shown on the calendar but count neither for nor against the attendance rate.
+  // "Overtime present" days (under 3 hours of overtime) are shown on the calendar but count neither for nor against the attendance rate.
   const attended = c.PRESENT + c.LATE + c.HALF_DAY;
   const denom = attended + c.ABSENT;
   return {

@@ -33,40 +33,48 @@ function resolveDeadline(d, now) {
 }
 
 /* ------------------------------------------------------------------ create */
-async function createTask(user, input) {
+// One task per assigned person, all sharing the same title, priority, project and deadline.
+async function createTasks(user, input) {
   const now = new Date();
-  const assignee = await User.findOne({ _id: input.assignedTo, status: 'ACTIVE' });
-  if (!assignee) throw new AppError('Please choose a valid team member.', 400);
+  const ids = [...new Set([].concat(input.assignedTo).map(String))];
+  const assignees = await User.find({ _id: { $in: ids }, status: 'ACTIVE' });
+  if (!ids.length || assignees.length !== ids.length) throw new AppError('Please choose valid team members.', 400);
+  const ordered = ids.map((id) => assignees.find((u) => String(u._id) === id));
 
   const project = input.projectId ? await projects.assertOpenForTasks(input.projectId) : null;
-
   const deadline = resolveDeadline(input.deadline, now);
+  const group = ordered.length > 1 ? ordered.map((u) => u.name) : null;
 
-  const task = await Task.create({
-    title: input.title,
-    description: input.description,
-    createdBy: user._id,
-    assignedTo: assignee._id,
-    priority: input.priority,
-    projectId: project ? input.projectId : null,
-    status: 'ACTIVE',
-    startedAt: now,
-    originalDeadline: deadline,
-    currentDeadline: deadline,
-    originalDuration: Math.round((deadline - now) / 60000),
-  });
-
-  const meta = { title: task.title, priority: task.priority, assignedTo: String(assignee._id), deadline: deadline.toISOString(), project: project ? project.name : null };
-  await activity.log(user._id, 'TASK_CREATED', 'Task', task._id, `${user.name} created “${task.title}”${project ? ` in ${project.name}` : ''}`, meta);
-  if (String(assignee._id) !== String(user._id)) {
-    await activity.log(user._id, 'TASK_ASSIGNED', 'Task', task._id, `${user.name} assigned “${task.title}” to ${assignee.name}`, meta);
-    await notify(assignee._id, {
-      type: 'TASK_ASSIGNED', title: 'New task assigned',
-      message: `${user.name} assigned you “${task.title}”${project ? ` (${project.name})` : ''}.`, entityType: 'Task', entityId: task._id, link: `/tasks/${task._id}`,
+  const tasks = [];
+  for (const assignee of ordered) {
+    const task = await Task.create({
+      title: input.title,
+      description: input.description,
+      createdBy: user._id,
+      assignedTo: assignee._id,
+      priority: input.priority,
+      projectId: project ? input.projectId : null,
+      status: 'ACTIVE',
+      startedAt: now,
+      originalDeadline: deadline,
+      currentDeadline: deadline,
+      originalDuration: Math.round((deadline - now) / 60000),
     });
+    tasks.push(task);
+
+    const meta = { title: task.title, priority: task.priority, assignedTo: String(assignee._id), deadline: deadline.toISOString(), project: project ? project.name : null, sharedWith: group };
+    await activity.log(user._id, 'TASK_CREATED', 'Task', task._id, `${user.name} created “${task.title}”${project ? ` in ${project.name}` : ''}`, meta);
+    if (String(assignee._id) !== String(user._id)) {
+      await activity.log(user._id, 'TASK_ASSIGNED', 'Task', task._id, `${user.name} assigned “${task.title}” to ${assignee.name}`, meta);
+      await notify(assignee._id, {
+        type: 'TASK_ASSIGNED', title: 'New task assigned',
+        message: `${user.name} assigned you “${task.title}”${project ? ` (${project.name})` : ''}${group ? `, together with ${group.filter((n) => n !== assignee.name).join(' and ')}` : ''}.`,
+        entityType: 'Task', entityId: task._id, link: `/tasks/${task._id}`,
+      });
+    }
+    await activity.log(user._id, 'DEADLINE_SET', 'Task', task._id, `Deadline set for “${task.title}”`, { deadline: deadline.toISOString() });
   }
-  await activity.log(user._id, 'DEADLINE_SET', 'Task', task._id, `Deadline set for “${task.title}”`, { deadline: deadline.toISOString() });
-  return task;
+  return tasks;
 }
 
 /* ---------------------------------------------------------------- complete */
@@ -439,6 +447,6 @@ async function decorate(tasks, viewer, { withTimeline = false } = {}) {
 }
 
 module.exports = {
-  POPULATE, EXTENDABLE, createTask, completeTask, cancelTask, reopenTask, updateTask,
+  POPULATE, EXTENDABLE, createTasks, completeTask, cancelTask, reopenTask, updateTask,
   requestExtension, decideExtension, processOverdue, processReminders, decorate,
 };

@@ -27,6 +27,7 @@ const attendanceSchema = new mongoose.Schema(
     note: { type: String, default: '' },
     workSummary: { type: String, default: '', maxlength: 500 }, // what the person did, written at clock-out
     autoClosed: { type: Boolean, default: false }, // clock-out was forgotten; closed at shift end
+    autoPresent: { type: Boolean, default: false }, // made PRESENT automatically by 3+ hours of overtime (no main clock-in)
     overtime: { type: [overtimeSchema], default: [] },
     overtimeMinutes: { type: Number, default: 0 }, // total of the finished overtime sessions
   },

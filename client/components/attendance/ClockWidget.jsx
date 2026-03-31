@@ -63,6 +63,7 @@ export default function ClockWidget({ compact = false }) {
         {working && (overtimeRunning ? <Badge tone="overtime" dot>Overtime</Badge> : <Badge tone="success" dot>Working</Badge>)}
         {!working && done && <Badge tone="info" dot>Completed</Badge>}
         {!working && onLeave && <Badge tone="accent" dot>On leave</Badge>}
+        {!working && data?.state === 'PRESENT' && <Badge tone="success" dot>Present</Badge>}
         {!working && data?.state === 'OVERTIME' && <Badge tone="overtime" dot>Overtime present</Badge>}
         {!working && data?.state === 'ABSENT' && <Badge tone="danger" dot>Absent</Badge>}
         {!working && data?.state === 'NOT_STARTED' && <Badge tone="muted" dot>Not started</Badge>}
@@ -95,7 +96,7 @@ export default function ClockWidget({ compact = false }) {
         {!working && canIn && (
           <>
             <button onClick={doClockIn} disabled={busy} className={overtimeMode ? 'btn-soft w-full' : 'btn-primary w-full'}>{busy ? <Spinner /> : <Icon name={overtimeMode ? 'zap' : 'login'} />}{clockIn.isPending ? 'Clocking in…' : overtimeMode ? 'Clock In · Overtime' : 'Clock In'}</button>
-            {overtimeMode && <p className="text-center text-xs font-semibold text-muted">Outside your shift — this counts as overtime. You can clock in any time of day.</p>}
+            {overtimeMode && <p className="text-center text-xs font-semibold text-muted">Outside your shift — this counts as overtime. Work 3 hours or more and the day counts as present automatically.</p>}
           </>
         )}
         {working && <p className="text-center text-[11px] font-semibold text-muted">Forgot to clock out? It closes by itself after 5 hours.</p>}

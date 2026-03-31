@@ -31,7 +31,8 @@ const projectRef = z.union([oid, z.literal(''), z.null()]).optional();
 const createTask = z.object({
   title: z.string().trim().min(2, 'Give the task a title.').max(140),
   description: z.string().trim().max(2000).optional().default(''),
-  assignedTo: oid,
+  // One person, or several: every person gets their own copy of the task (own deadline clock, completion and score).
+  assignedTo: z.union([oid, z.array(oid).min(1, 'Choose who this is for.').max(10)]),
   priority: z.enum(PRIORITIES).default('MEDIUM'),
   projectId: projectRef,
   deadline,
