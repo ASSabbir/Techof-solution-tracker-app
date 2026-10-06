@@ -1,0 +1,9 @@
+# Optional: run a local MongoDB with `docker compose up -d`
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports: ["27017:27017"]
+    volumes: ["techof-mongo:/data/db"]
+volumes:
+  techof-mongo:

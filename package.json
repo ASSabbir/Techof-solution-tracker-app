@@ -1,0 +1,20 @@
+{
+  "name": "techof-solution-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TechOf Solution Tracker - internal task accountability, attendance and leaderboard app",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "node scripts/run-all.js dev",
+    "build": "npm run build -w client",
+    "start": "node scripts/run-all.js start",
+    "seed": "npm run seed -w server",
+    "seed:demo": "npm run seed:demo -w server"
+  },
+  "engines": {
+    "node": ">=18.18"
+  }
+}
