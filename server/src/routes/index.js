@@ -13,6 +13,20 @@ const api = express.Router();
 
 api.get('/health', (_req, res) => res.json({ ok: true, data: { status: 'up', time: new Date().toISOString() } }));
 
+// Scheduled work for serverless hosts (Vercel Cron sends `Authorization: Bearer $CRON_SECRET`).
+api.get('/cron', async (req, res, next) => {
+  try {
+    const secret = process.env.CRON_SECRET;
+    if (!secret || req.headers.authorization !== `Bearer ${secret}`) return res.status(401).json({ ok: false, message: 'Unauthorized.' });
+    const taskSvc = require('../services/task.service');
+    const attendance = require('../services/attendance.service');
+    const overdue = await taskSvc.processOverdue({ force: true });
+    const reminders = await taskSvc.processReminders();
+    const absent = await attendance.processAbsent();
+    res.json({ ok: true, data: { overdue, reminders, absent } });
+  } catch (err) { next(err); }
+});
+
 /* /api/auth */
 const authR = express.Router();
 authR.post('/login', loginLimiter, auth.login);

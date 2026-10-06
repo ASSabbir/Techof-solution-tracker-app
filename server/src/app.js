@@ -8,20 +8,23 @@ const { sanitize, serverTime, apiLimiter } = require('./middleware/security');
 const { notFound, errorHandler } = require('./middleware/error');
 
 const app = express();
-if (config.isProd) app.set('trust proxy', 1);
+app.set('trust proxy', 1);
 
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+// Open CORS: any frontend origin may call this API (fine for a private 3-person tool).
+// Must stay first so browser preflight (OPTIONS) requests are answered before anything else.
 app.use(
   cors({
-    origin(origin, cb) {
-      if (!origin) return cb(null, true);
-      const okOrigin = config.clientUrls.includes(origin) || (!config.isProd && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin));
-      cb(okOrigin ? null : new Error('Not allowed by CORS'), okOrigin);
-    },
+    origin: true,
+    credentials: false,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     exposedHeaders: ['X-Server-Time'],
-    maxAge: 600,
+    maxAge: 86400,
   })
 );
+app.options('*', cors({ origin: true }));
+
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 if (!config.isProd) app.use(morgan('dev'));
 app.use(express.json({ limit: '400kb' }));
 app.use(sanitize);

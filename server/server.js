@@ -17,7 +17,7 @@ async function main() {
   const server = app.listen(config.port, () => {
     console.log(`[api] TechOf Solution Tracker API running on http://localhost:${config.port}/api`);
   });
-  jobs.start();
+  if (!process.env.VERCEL) jobs.start();
 
   const shutdown = async () => {
     server.close();

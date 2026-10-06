@@ -4,7 +4,7 @@ const guard = require('../utils/immutable');
 const { ObjectId } = mongoose.Schema.Types;
 
 const extensionSchema = new mongoose.Schema({
-  taskId: { type: ObjectId, ref: 'Task', required: true, index: true, immutable: true },
+  taskId: { type: ObjectId, ref: 'Task', required: true, immutable: true },
   requestedBy: { type: ObjectId, ref: 'User', required: true, immutable: true },
   approvedBy: { type: ObjectId, ref: 'User' },
   decidedBy: { type: ObjectId, ref: 'User' },
