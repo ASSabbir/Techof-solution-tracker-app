@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { useServerNow } from '@/lib/clock';
 import { timeAgo } from '@/lib/format';
 import { gsap, motionOK } from '@/lib/motion';
+import { kindFor, playChime, setSoundEnabled, soundEnabled } from '@/lib/sound';
 import { useAction, useNotifications } from '@/hooks/queries';
 import { useToast } from '@/components/contexts';
 import Icon from '@/components/ui/Icon';
@@ -15,6 +16,8 @@ const ICON = {
   TASK_ASSIGNED: 'mine', TASK_REMINDER: 'timer', TASK_OVERDUE: 'warning', EXTENSION_REQUESTED: 'hourglass',
   EXTENSION_APPROVED: 'ok', EXTENSION_REJECTED: 'no', TASK_COMPLETED: 'check', TASK_CANCELLED: 'ban',
   LEAVE_SUBMITTED: 'leave', LEAVE_APPROVED: 'ok', LEAVE_REJECTED: 'no',
+  MEETING_ANNOUNCED: 'meetingAdd', MEETING_RESPONSIBLE: 'project', MEETING_UPDATED: 'meeting', MEETING_RSVP: 'going',
+  MEETING_CANCELLED: 'ban', MEETING_REMINDER: 'timer',
 };
 
 export default function Notifications() {
@@ -26,6 +29,9 @@ export default function Notifications() {
   const now = useServerNow();
   const { data } = useNotifications();
   const seen = useRef(null);
+  const [sound, setSound] = useState(true);
+  useEffect(() => { setSound(soundEnabled()); }, []);
+  const toggleSound = () => { const next = !sound; setSound(next); setSoundEnabled(next); if (next) playChime('default', { force: true }); };
   const markAll = useAction(() => api('/notifications/read-all', { method: 'POST' }), { silentError: true });
   const markOne = useAction((id) => api(`/notifications/${id}/read`, { method: 'PATCH' }), { silentError: true });
 
@@ -34,7 +40,13 @@ export default function Notifications() {
     if (!data) return;
     const ids = new Set(data.items.map((n) => n._id));
     if (seen.current) {
-      data.items.filter((n) => !seen.current.has(n._id) && !n.readAt).slice(0, 2).forEach((n) => toast.info(n.message, { title: n.title }));
+      const fresh = data.items.filter((n) => !seen.current.has(n._id) && !n.readAt);
+      fresh.slice(0, 2).forEach((n) => toast.info(n.message, { title: n.title }));
+      // One sound per batch; the most urgent kind wins (alert > meeting > default).
+      if (fresh.length) {
+        const kinds = fresh.map((n) => kindFor(n.type));
+        playChime(kinds.includes('alert') ? 'alert' : kinds.includes('meeting') ? 'meeting' : 'default');
+      }
     }
     seen.current = ids;
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -48,6 +60,13 @@ export default function Notifications() {
   }, [open]);
 
   const unread = data?.unread || 0;
+
+  // Show the unread count in the browser tab title, e.g. "(2) TechOf Solution Tracker".
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\)\s*/, '');
+    document.title = unread > 0 ? `(${unread}) ${base}` : base;
+  }, [unread]);
+
   return (
     <div className="relative" ref={wrap}>
       <button onClick={() => setOpen((o) => !o)} className="btn-soft relative !rounded-xl !p-2.5" aria-label="Notifications">
@@ -58,7 +77,10 @@ export default function Notifications() {
         <div ref={panel} className="card absolute right-0 top-full z-50 mt-3 w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden">
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <p className="font-extrabold">Notifications {unread > 0 && <span className="ml-1 rounded-full bg-accent/15 px-2 py-0.5 text-xs text-accent">{unread}</span>}</p>
-            {unread > 0 && <button onClick={() => markAll.mutate()} className="text-xs font-bold text-accent hover:underline">Mark all read</button>}
+            <div className="flex items-center gap-3">
+              <button onClick={toggleSound} className="text-muted transition hover:text-ink" aria-label={sound ? 'Mute notification sound' : 'Unmute notification sound'} title={sound ? 'Sound on' : 'Sound off'}><Icon name={sound ? 'volume' : 'mute'} className="h-4 w-4" /></button>
+              {unread > 0 && <button onClick={() => markAll.mutate()} className="text-xs font-bold text-accent hover:underline">Mark all read</button>}
+            </div>
           </div>
           <div className="max-h-[26rem] overflow-y-auto">
             {!data?.items.length ? (
@@ -66,7 +88,7 @@ export default function Notifications() {
             ) : data.items.map((n) => (
               <button key={n._id} onClick={() => { if (!n.readAt) markOne.mutate(n._id); setOpen(false); if (n.link) router.push(n.link); }}
                 className={clsx('flex w-full items-start gap-3 border-b border-line/60 px-4 py-3 text-left transition last:border-0 hover:bg-surface-2', !n.readAt && 'bg-accent/5')}>
-                <span className={clsx('mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg', n.type === 'TASK_OVERDUE' || n.type === 'EXTENSION_REJECTED' ? 'bg-danger/12 text-danger' : n.type === 'TASK_REMINDER' ? 'bg-warning/12 text-warning' : 'bg-accent/12 text-accent')}><Icon name={ICON[n.type] || 'bell'} className="h-4 w-4" /></span>
+                <span className={clsx('mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg', n.type === 'TASK_OVERDUE' || n.type === 'EXTENSION_REJECTED' || n.type === 'MEETING_CANCELLED' ? 'bg-danger/12 text-danger' : n.type === 'TASK_REMINDER' || n.type === 'MEETING_REMINDER' ? 'bg-warning/12 text-warning' : 'bg-accent/12 text-accent')}><Icon name={ICON[n.type] || 'bell'} className="h-4 w-4" /></span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2 text-sm font-bold">{!n.readAt && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}{n.title}</span>
                   <span className="block text-sm text-muted">{n.message}</span>

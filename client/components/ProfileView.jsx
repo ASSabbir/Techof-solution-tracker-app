@@ -42,7 +42,7 @@ function PasswordForm() {
     <form className="space-y-4" noValidate onSubmit={handleSubmit(async (v) => {
       try {
         const d = await change.mutateAsync({ currentPassword: v.currentPassword, newPassword: v.newPassword });
-        tokenStore.set(d.token, !!localStorage.getItem('techof_token'));
+        tokenStore.set(d.token);
         reset();
       } catch {}
     })}>

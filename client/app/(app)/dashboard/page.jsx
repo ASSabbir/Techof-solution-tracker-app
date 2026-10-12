@@ -5,7 +5,7 @@ import { useServerNow } from '@/lib/clock';
 import { fmtLongDate, greeting } from '@/lib/format';
 import { PRESENCE_META, TONE } from '@/lib/constants';
 import { useEnter } from '@/hooks/useEnter';
-import { useDashboard } from '@/hooks/queries';
+import { useDashboard, useMeetings } from '@/hooks/queries';
 import { useAuth, useUI } from '@/components/contexts';
 import { Avatar, Badge, EmptyState, ErrorState, Skeleton, Stat } from '@/components/ui/primitives';
 import Icon from '@/components/ui/Icon';
@@ -13,6 +13,7 @@ import TaskCard from '@/components/tasks/TaskCard';
 import ClockWidget from '@/components/attendance/ClockWidget';
 import ActivityList from '@/components/ActivityList';
 import Approvals from '@/components/Approvals';
+import { DateTile, PhaseBadge, phaseOf, timeRange } from '@/components/meetings/parts';
 
 function DashboardSkeleton() {
   return (
@@ -29,6 +30,7 @@ export default function DashboardPage() {
   const ui = useUI();
   const now = useServerNow();
   const { data, isLoading, isError, refetch } = useDashboard();
+  const meetings = useMeetings();
   const ref = useEnter(!!data);
 
   if (isLoading) return <DashboardSkeleton />;
@@ -40,9 +42,11 @@ export default function DashboardPage() {
     { label: 'My Tasks', icon: 'mine', href: '/tasks/my' },
     { label: 'Request Extension', icon: 'timer', onClick: () => ui.openExtension() },
     { label: 'Apply Leave', icon: 'leave', onClick: () => ui.openLeave() },
+    { label: 'Meetings', icon: 'meeting', href: '/meetings' },
     { label: 'Attendance', icon: 'clock', href: '/attendance' },
   ];
   const perf = data.performance;
+  const nextMeetings = (meetings.data || []).filter((m) => ['upcoming', 'live'].includes(phaseOf(m, now))).slice(0, 3);
 
   return (
     <div ref={ref} className="space-y-6">
@@ -67,6 +71,27 @@ export default function DashboardPage() {
       </div>
 
       <Approvals extensions={data.approvals.extensions} leaves={data.approvals.leaves} />
+
+      {nextMeetings.length > 0 && (
+        <div className="card card-pad" data-anim>
+          <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-extrabold">Upcoming meetings</h2><Link href="/meetings" className="text-sm font-bold text-accent hover:underline">View all</Link></div>
+          <ul className="grid gap-3 md:grid-cols-3">
+            {nextMeetings.map((m) => (
+              <li key={m._id}>
+                <Link href={`/meetings?open=${m._id}`} className="flex items-start gap-3 rounded-xl border border-line bg-surface-2/50 p-3 transition hover:border-accent/40">
+                  <DateTile date={m.startsAt} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-extrabold">{m.title}</p>
+                    <p className="truncate text-xs text-muted">{m.projectName} · {m.companyName}</p>
+                    <p className="mt-0.5 text-xs font-semibold">{timeRange(m)}</p>
+                    <div className="mt-1.5 flex items-center gap-2"><PhaseBadge m={m} now={now} />{m.myResponse === 'PENDING' && <span className="text-[11px] font-bold text-warning">Reply needed</span>}</div>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">

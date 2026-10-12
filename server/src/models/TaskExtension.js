@@ -20,11 +20,13 @@ const extensionSchema = new mongoose.Schema({
   approvedAt: Date,
   rejectedAt: Date,
   cancelledAt: Date,
+  expireAt: Date, // set when the parent task closes (removed automatically 30 days later)
 });
 
 // Only one open request per task at a time.
 extensionSchema.index({ taskId: 1 }, { unique: true, partialFilterExpression: { status: 'PENDING' } });
 extensionSchema.index({ status: 1, requestedAt: -1 });
+extensionSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 });
 
 guard(extensionSchema, {
   protectedPaths: ['taskId', 'requestedBy', 'requestedMinutes', 'reason', 'sequence', 'previousDeadline', 'requestedAt'],

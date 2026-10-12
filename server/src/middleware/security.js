@@ -43,6 +43,6 @@ exports.loginLimiter = rateLimit({
   legacyHeaders: false,
   skipSuccessfulRequests: true,
   keyGenerator: (req) => `${req.ip}:${String(req.body?.identifier || '').toLowerCase()}`,
-  validate: { keyGeneratorIpFallback: false, ip: false },
+  validate: false, // works on every express-rate-limit 7.x version; this limiter keys on ip + username on purpose
   message: { ok: false, code: 'RATE_LIMITED', message: 'Too many login attempts. Please try again in a few minutes.' },
 });

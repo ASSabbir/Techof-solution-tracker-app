@@ -15,5 +15,7 @@ const notificationSchema = new mongoose.Schema({
 });
 notificationSchema.index({ userId: 1, createdAt: -1 });
 notificationSchema.index({ userId: 1, readAt: 1 });
+// Notifications are cleaned up after 14 days.
+notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 14 * 24 * 3600 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

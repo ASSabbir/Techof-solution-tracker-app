@@ -1,4 +1,4 @@
-/* Seeds the three team members (and optionally demo data).
+/* Seeds the team members (and optionally demo data).
    npm run seed        -> users + settings only
    npm run seed:demo   -> also wipes tasks/attendance/etc. and loads realistic sample data */
 const bcrypt = require('bcryptjs');
@@ -19,6 +19,9 @@ const TEAM = [
   { name: 'Sabbir', username: 'sabbir', email: 'sabbir@techof.dev' },
   { name: 'Billah', username: 'billah', email: 'billah@techof.dev' },
   { name: 'Noman', username: 'noman', email: 'noman@techof.dev' },
+  // Arman Sir oversees the team: he signs in, assigns tasks, approves extensions and joins meetings,
+  // but he is not part of attendance or the leaderboard.
+  { name: 'Arman Sir', username: 'arman', email: 'arman@techof.dev', role: 'MANAGER' },
 ];
 const H = 3600_000;
 const M = 60_000;
@@ -175,7 +178,7 @@ async function seedDemo(u) {
     await wipe();
     await seedDemo(users);
   }
-  console.log(`\nDone. Sign in with username "sabbir", "billah" or "noman".`);
+  console.log(`\nDone. Sign in with username "sabbir", "billah", "noman" or "arman".`);
   console.log(`Password: ${config.seedPassword}   (change it from Profile → Security)\n`);
   process.exit(0);
 })().catch((err) => {

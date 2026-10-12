@@ -13,7 +13,8 @@ const activitySchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now, immutable: true },
 });
 activitySchema.index({ entityType: 1, entityId: 1, createdAt: 1 });
-activitySchema.index({ createdAt: -1 });
+// Activity is kept for 7 days only, then MongoDB removes it automatically.
+activitySchema.index({ createdAt: 1 }, { expireAfterSeconds: 7 * 24 * 3600 });
 activitySchema.index({ userId: 1, createdAt: -1 });
 
 // The audit trail is strictly append-only.

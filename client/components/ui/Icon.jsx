@@ -6,6 +6,8 @@ import {
   LuArrowLeft, LuRefreshCw, LuInbox, LuFileText, LuShieldCheck, LuHistory, LuSparkles, LuPanelLeftClose,
   LuPanelLeftOpen, LuBan, LuCircleCheck, LuCircleX, LuCircleAlert, LuRocket, LuLayers, LuMedal, LuCrown,
   LuTrendingUp, LuUserCheck, LuSave, LuSlidersHorizontal, LuPencil,
+  LuVideo, LuMapPin, LuPhone, LuBuilding2, LuBriefcase, LuVolume2, LuVolumeX, LuCircleHelp, LuCalendarPlus, LuCalendarCheck,
+  LuStickyNote, LuThumbsUp,
 } from 'react-icons/lu';
 
 export const ICONS = {
@@ -19,6 +21,8 @@ export const ICONS = {
   history: LuHistory, sparkles: LuSparkles, collapse: LuPanelLeftClose, expand: LuPanelLeftOpen, ban: LuBan,
   ok: LuCircleCheck, no: LuCircleX, alert: LuCircleAlert, rocket: LuRocket, layers: LuLayers, medal: LuMedal, crown: LuCrown,
   trend: LuTrendingUp, userCheck: LuUserCheck, save: LuSave, sliders: LuSlidersHorizontal, edit: LuPencil,
+  video: LuVideo, pin: LuMapPin, phone: LuPhone, company: LuBuilding2, project: LuBriefcase, volume: LuVolume2, mute: LuVolumeX,
+  maybe: LuCircleHelp, meetingAdd: LuCalendarPlus, meeting: LuCalendarCheck, note: LuStickyNote, going: LuThumbsUp,
 };
 
 export default function Icon({ name, className = 'h-4 w-4', ...rest }) {

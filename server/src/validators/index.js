@@ -76,17 +76,22 @@ const leaveQuery = z.object({
 });
 
 const clockIn = z.object({ override: z.boolean().optional().default(false) });
+const clockOut = z.object({ summary: z.string().trim().max(500, 'Keep it under 500 characters.').optional().default('') });
 const historyQuery = z.object({ month: monthStr.optional(), userId: oid.optional() });
 
 const profile = z.object({
   name: z.string().trim().min(2).max(60).optional(),
   avatar: z.string().max(200000).refine((v) => v === '' || v.startsWith('data:image/'), 'Invalid image.').optional(),
+  // Personal shift; empty string resets to the team default.
+  shiftStart: z.union([hhmm, z.literal('')]).optional(),
+  shiftEnd: z.union([hhmm, z.literal('')]).optional(),
 });
 
 const settings = z
   .object({
     workdayStart: hhmm,
-    lateAfter: hhmm,
+    lateGraceMinutes: z.number().int().min(0).max(180),
+    clockInEarlyMinutes: z.number().int().min(0).max(360),
     workdayEnd: hhmm,
     workingDays: z.array(z.number().int().min(0).max(6)).min(1).max(7),
     requireExtensionApproval: z.boolean(),
@@ -109,14 +114,40 @@ const settings = z
 
 const activityQuery = z.object({
   userId: oid.optional(),
-  entityType: z.enum(['Task', 'Attendance', 'Leave', 'User', 'Settings']).optional(),
+  entityType: z.enum(['Task', 'Attendance', 'Leave', 'User', 'Settings', 'Meeting']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(30),
 });
+
+const meetingBase = {
+  title: z.string().trim().min(3, 'What is the meeting about?').max(140),
+  projectName: z.string().trim().min(1, 'Add the project name.').max(100),
+  companyName: z.string().trim().min(1, 'Add the company name.').max(100),
+  personName: z.string().trim().min(1, 'Who are we meeting?').max(100),
+  responsible: oid,
+  startsAt: z.string().datetime({ offset: true }),
+  durationMinutes: z.number().int().min(5).max(720),
+  mode: z.enum(['ONLINE', 'IN_PERSON', 'PHONE']),
+  location: z.string().trim().max(300),
+  agenda: z.string().trim().max(2000),
+};
+const meetingCreate = z.object({
+  ...meetingBase,
+  durationMinutes: meetingBase.durationMinutes.default(60),
+  mode: meetingBase.mode.default('ONLINE'),
+  location: meetingBase.location.optional().default(''),
+  agenda: meetingBase.agenda.optional().default(''),
+});
+const meetingUpdate = z.object({ ...meetingBase, notes: z.string().trim().max(3000) }).partial().strict();
+const meetingRsvp = z.object({
+  response: z.enum(['GOING', 'MAYBE', 'NOT_GOING']),
+  note: z.string().trim().max(200).optional().default(''),
+});
+
 const leaderboardQuery = z.object({ period: z.enum(['all', 'month', 'week']).default('all') });
 
 module.exports = {
   oid, login, changePassword, createTask, updateTask, requestExtension, decision, cancelTask,
-  taskQuery, leaveCreate, leaveQuery, clockIn, historyQuery, profile, settings, activityQuery,
-  leaderboardQuery, monthStr, dateStr,
+  taskQuery, leaveCreate, leaveQuery, clockIn, clockOut, historyQuery, profile, settings, activityQuery,
+  leaderboardQuery, monthStr, dateStr, meetingCreate, meetingUpdate, meetingRsvp,
 };

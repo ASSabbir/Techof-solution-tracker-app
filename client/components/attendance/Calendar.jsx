@@ -68,7 +68,14 @@ export function DayDetail({ day }) {
           <div className="flex justify-between py-2.5"><dt className="text-muted">Status</dt><dd className={clsx('font-bold', TONE[meta.tone].text)}>{meta.label}</dd></div>
           {r.note && <div className="flex justify-between gap-4 py-2.5"><dt className="text-muted">Reason</dt><dd className="text-right font-semibold">{r.note}</dd></div>}
           {r.overrideLeave && <div className="py-2.5 text-xs font-semibold text-warning">Clocked in over approved leave</div>}
+          {r.autoClosed && <div className="py-2.5 text-xs font-semibold text-muted">Clock-out was missed, closed automatically at shift end</div>}
         </dl>
+      )}
+      {r?.workSummary && (
+        <div className="mt-4 rounded-xl border border-line bg-surface-2/60 p-3.5">
+          <p className="eyebrow mb-1.5">What was done</p>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">{r.workSummary}</p>
+        </div>
       )}
     </div>
   );

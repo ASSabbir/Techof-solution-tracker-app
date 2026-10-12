@@ -6,7 +6,8 @@ const settingsSchema = new mongoose.Schema(
     key: { type: String, unique: true, default: 'global' },
     timezone: { type: String, default: config.timezone },
     workdayStart: { type: String, default: '09:00' },
-    lateAfter: { type: String, default: '09:15' },
+    lateGraceMinutes: { type: Number, default: 15 }, // clock-ins later than shift start + grace count as Late
+    clockInEarlyMinutes: { type: Number, default: 60 }, // clock-in opens this long before the shift starts
     workdayEnd: { type: String, default: '18:00' },
     workingDays: { type: [Number], default: [6, 0, 1, 2, 3, 4] }, // 0 = Sunday ... 6 = Saturday (Sat-Thu)
     requireExtensionApproval: { type: Boolean, default: true },

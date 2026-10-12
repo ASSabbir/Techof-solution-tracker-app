@@ -12,7 +12,8 @@ exports.clockIn = asyncHandler(async (req, res) => {
   ok(res, { record: rec, today: await svc.today(req.user) }, 201);
 });
 exports.clockOut = asyncHandler(async (req, res) => {
-  const rec = await svc.clockOut(req.user);
+  const { summary } = v.clockOut.parse(req.body || {});
+  const rec = await svc.clockOut(req.user, summary);
   ok(res, { record: rec, today: await svc.today(req.user) });
 });
 exports.today = asyncHandler(async (req, res) => ok(res, await svc.today(req.user)));

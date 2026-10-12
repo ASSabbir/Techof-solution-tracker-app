@@ -2,6 +2,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/contexts';
+import { playChime } from '@/lib/sound';
 
 const opts = (extra = {}) => ({ placeholderData: keepPreviousData, ...extra });
 
@@ -23,7 +24,7 @@ export const useTask = (id) =>
   useQuery({ queryKey: ['task', id], queryFn: () => api(`/tasks/${id}`).then((d) => d.task), enabled: !!id, refetchInterval: 15_000 });
 
 export const useNotifications = () =>
-  useQuery({ queryKey: ['notifications'], queryFn: () => api('/notifications', { params: { limit: 30 } }), refetchInterval: 20_000 });
+  useQuery({ queryKey: ['notifications'], queryFn: () => api('/notifications', { params: { limit: 30 } }), refetchInterval: 20_000, refetchIntervalInBackground: true });
 
 export const useAttendanceToday = () =>
   useQuery({ queryKey: ['attendance', 'today'], queryFn: () => api('/attendance/today'), refetchInterval: 60_000 });
@@ -36,6 +37,9 @@ export const useAttendanceTeam = () =>
 
 export const useAttendanceDay = (date) =>
   useQuery({ queryKey: ['attendance', 'day', date], queryFn: () => api(`/attendance/day/${date}`), enabled: !!date });
+
+export const useMeetings = () =>
+  useQuery({ queryKey: ['meetings'], queryFn: () => api('/meetings').then((d) => d.meetings), refetchInterval: 30_000 });
 
 export const useLeaves = (scope) =>
   useQuery({ queryKey: ['leave', scope], queryFn: () => api('/leave', { params: { scope } }).then((d) => d.leaves), refetchInterval: 45_000 });
@@ -53,12 +57,14 @@ export const useSettings = () =>
   useQuery({ queryKey: ['settings'], queryFn: () => api('/settings').then((d) => d.settings), staleTime: 60_000 });
 
 // Generic mutation: toasts on success/error and refreshes everything (tiny app, tiny cost).
-export function useAction(fn, { success, onSuccess, silentError } = {}) {
+// `sound` plays one of the chimes in lib/sound.js when the action succeeds (e.g. 'clockin', 'create', 'complete').
+export function useAction(fn, { success, onSuccess, silentError, sound } = {}) {
   const qc = useQueryClient();
   const toast = useToast();
   return useMutation({
     mutationFn: fn,
     onSuccess: async (data, vars) => {
+      if (sound) playChime(sound);
       await qc.invalidateQueries();
       if (success) toast.success(typeof success === 'function' ? success(data, vars) : success);
       onSuccess?.(data, vars);

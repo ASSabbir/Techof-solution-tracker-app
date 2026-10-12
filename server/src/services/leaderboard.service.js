@@ -101,7 +101,7 @@ async function userAchievements(userId) {
 async function leaderboard(period = 'all') {
   const settings = await getSettings();
   const [users, periodRows, allRows] = await Promise.all([
-    User.find({ status: 'ACTIVE' }).select('name username avatar').lean(),
+    User.find({ status: 'ACTIVE', role: { $ne: 'MANAGER' } }).select('name username avatar').lean(),
     aggregate(periodMatch(period)),
     aggregate(),
   ]);

@@ -1,22 +1,26 @@
 import { setServerTime } from './clock';
 
-const BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://techof-task.vercel.app/api').replace(/\/$/, '');
+const BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 const KEY = 'techof_token';
+const USER_KEY = 'techof_user';
 
 export const tokenStore = {
   get() {
     if (typeof window === 'undefined') return null;
-    try { return localStorage.getItem(KEY) || sessionStorage.getItem(KEY); } catch { return null; }
+    try { return localStorage.getItem(KEY); } catch { return null; }
   },
-  set(token, remember = true) {
-    try {
-      localStorage.removeItem(KEY);
-      sessionStorage.removeItem(KEY);
-      (remember ? localStorage : sessionStorage).setItem(KEY, token);
-    } catch {}
+  // The session is always kept in localStorage so nobody has to log in again and again.
+  set(token) {
+    try { localStorage.setItem(KEY, token); sessionStorage.removeItem(KEY); } catch {}
+  },
+  getUser() {
+    try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch { return null; }
+  },
+  setUser(user) {
+    try { localStorage.setItem(USER_KEY, JSON.stringify(user)); } catch {}
   },
   clear() {
-    try { localStorage.removeItem(KEY); sessionStorage.removeItem(KEY); } catch {}
+    try { localStorage.removeItem(KEY); localStorage.removeItem(USER_KEY); sessionStorage.removeItem(KEY); } catch {}
   },
 };
 

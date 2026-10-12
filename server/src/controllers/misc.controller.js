@@ -20,6 +20,8 @@ exports.leaderboard = asyncHandler(async (req, res) => {
 
 /* notifications */
 exports.notifications = asyncHandler(async (req, res) => {
+  // Meeting reminders are checked here (throttled) because every open tab polls this endpoint.
+  await require('../services/meeting.service').processReminders().catch(() => {});
   const limit = Math.min(Number(req.query.limit) || 30, 100);
   const filter = { userId: req.user._id, ...(req.query.unread === 'true' ? { readAt: null } : {}) };
   const [items, unread] = await Promise.all([

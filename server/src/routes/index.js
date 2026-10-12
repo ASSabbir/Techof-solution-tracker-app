@@ -8,6 +8,7 @@ const ext = require('../controllers/extensions.controller');
 const att = require('../controllers/attendance.controller');
 const leave = require('../controllers/leave.controller');
 const misc = require('../controllers/misc.controller');
+const meetings = require('../controllers/meetings.controller');
 
 const api = express.Router();
 
@@ -23,7 +24,8 @@ api.get('/cron', async (req, res, next) => {
     const overdue = await taskSvc.processOverdue({ force: true });
     const reminders = await taskSvc.processReminders();
     const absent = await attendance.processAbsent();
-    res.json({ ok: true, data: { overdue, reminders, absent } });
+    const meetingReminders = await require('../services/meeting.service').processReminders({ force: true });
+    res.json({ ok: true, data: { overdue, reminders, absent, meetingReminders } });
   } catch (err) { next(err); }
 });
 
@@ -85,6 +87,16 @@ leaveR.patch('/:id/approve', leave.approve);
 leaveR.patch('/:id/reject', leave.reject);
 leaveR.patch('/:id/cancel', leave.cancel);
 api.use('/leave', leaveR);
+
+/* /api/meetings */
+const meetR = express.Router();
+meetR.get('/', meetings.list);
+meetR.post('/', meetings.create);
+meetR.get('/:id', meetings.get);
+meetR.patch('/:id', meetings.update);
+meetR.post('/:id/rsvp', meetings.rsvp);
+meetR.post('/:id/cancel', meetings.cancel);
+api.use('/meetings', meetR);
 
 api.get('/leaderboard', misc.leaderboard);
 api.get('/dashboard', misc.dashboard);

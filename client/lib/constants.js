@@ -68,9 +68,22 @@ export const NAV = [
   { href: '/tasks/my', label: 'My Tasks', icon: 'mine' },
   { href: '/tasks/team', label: 'Team Tasks', icon: 'team' },
   { href: '/leaderboard', label: 'Leaderboard', icon: 'trophy' },
+  { href: '/meetings', label: 'Meetings', icon: 'meeting' },
   { href: '/attendance', label: 'Attendance', icon: 'clock' },
   { href: '/leave', label: 'Leave', icon: 'leave' },
   { href: '/activity', label: 'Activity', icon: 'activity' },
   { href: '/profile', label: 'Profile', icon: 'profile' },
   { href: '/settings', label: 'Settings', icon: 'settings' },
 ];
+
+export const MEETING_MODES = [
+  { value: 'ONLINE', label: 'Online', icon: 'video', placeholder: 'Meeting link (Google Meet, Zoom…)' },
+  { value: 'IN_PERSON', label: 'In person', icon: 'pin', placeholder: 'Address or place' },
+  { value: 'PHONE', label: 'Phone call', icon: 'phone', placeholder: 'Phone number' },
+];
+export const RSVP_META = {
+  GOING: { label: 'Going', short: 'Going', tone: 'success', icon: 'going' },
+  MAYBE: { label: 'Maybe', short: 'Maybe', tone: 'warning', icon: 'maybe' },
+  NOT_GOING: { label: 'Can’t go', short: 'No', tone: 'danger', icon: 'no' },
+  PENDING: { label: 'No response', short: '—', tone: 'muted', icon: 'clock' },
+};

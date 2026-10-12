@@ -8,8 +8,11 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true, select: false },
     avatar: { type: String, default: '', maxlength: 200000 },
     status: { type: String, enum: ['ACTIVE', 'DISABLED'], default: 'ACTIVE' },
-    // Reserved for the future role system (Admin / Manager / Team Lead / Member). Not used by the UI in v1.
+    // MANAGER (Arman Sir) is left out of attendance and the leaderboard. Everyone else is MEMBER.
     role: { type: String, enum: ['ADMIN', 'MANAGER', 'TEAM_LEAD', 'MEMBER'], default: 'MEMBER' },
+    // Personal shift (HH:MM, app timezone). Empty = use the team default from Settings. End <= start means the shift crosses midnight.
+    shiftStart: { type: String, default: null },
+    shiftEnd: { type: String, default: null },
     tokenVersion: { type: Number, default: 0, select: false },
     lastLoginAt: Date,
     lastSeenAt: Date,

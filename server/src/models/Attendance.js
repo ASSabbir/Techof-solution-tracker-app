@@ -15,6 +15,8 @@ const attendanceSchema = new mongoose.Schema(
     leaveId: { type: ObjectId, ref: 'LeaveRequest' },
     overrideLeave: { type: Boolean, default: false },
     note: { type: String, default: '' },
+    workSummary: { type: String, default: '', maxlength: 500 }, // what the person did, written at clock-out
+    autoClosed: { type: Boolean, default: false }, // clock-out was forgotten; closed at shift end
   },
   { timestamps: true }
 );

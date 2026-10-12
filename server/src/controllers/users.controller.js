@@ -55,6 +55,15 @@ exports.updateMe = asyncHandler(async (req, res) => {
   const changed = [];
   if (patch.name !== undefined && patch.name !== user.name) { user.name = patch.name; changed.push('name'); }
   if (patch.avatar !== undefined) { user.avatar = patch.avatar; changed.push('avatar'); }
+  if (patch.shiftStart !== undefined || patch.shiftEnd !== undefined) {
+    const settings = await getSettings();
+    const start = patch.shiftStart !== undefined ? patch.shiftStart : user.shiftStart || '';
+    const end = patch.shiftEnd !== undefined ? patch.shiftEnd : user.shiftEnd || '';
+    if ((start || settings.workdayStart) === (end || settings.workdayEnd)) throw new AppError('Shift start and end can’t be the same time.', 400);
+    user.shiftStart = start || null;
+    user.shiftEnd = end || null;
+    changed.push('shift');
+  }
   if (changed.length) {
     await user.save();
     await activity.log(user._id, 'PROFILE_UPDATED', 'User', user._id, `${user.name} updated their profile`, { changed });

@@ -21,7 +21,7 @@ function Body({ task }) {
   const ref = useEnter(true);
   const heroRef = useRef(null);
   const { state } = useTaskTiming(task);
-  const complete = useAction(() => api(`/tasks/${task._id}/complete`, { method: 'POST' }), { success: 'Task completed — nice work!' });
+  const complete = useAction(() => api(`/tasks/${task._id}/complete`, { method: 'POST' }), { success: 'Task completed — nice work!', sound: 'complete' });
   const cancel = useAction((reason) => api(`/tasks/${task._id}/cancel`, { method: 'POST', body: { reason } }), { success: 'Task cancelled.' });
   const decide = useAction(({ id, action }) => api(`/extensions/${id}/${action}`, { method: 'PATCH', body: {} }), { success: (_d, v) => (v.action === 'approve' ? 'Extension approved' : 'Extension rejected') });
   const p = task.permissions;

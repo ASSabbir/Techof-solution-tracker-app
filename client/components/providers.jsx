@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { api, tokenStore } from '@/lib/api';
 import { gsap, motionOK } from '@/lib/motion';
+import { unlockAudio } from '@/lib/sound';
 import { AuthContext, ToastContext, UIContext, useToast } from './contexts';
 import Icon from './ui/Icon';
 import Modal from './ui/Modal';
@@ -77,22 +78,36 @@ function ToastProvider({ children }) {
 
 /* ----------------------------------------------------------------- Auth */
 function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUserState] = useState(null);
   const [ready, setReady] = useState(false);
   const router = useRouter();
   const qc = useQueryClient();
 
+  // Keep a copy of the user so the app opens instantly on the next visit.
+  const setUser = useCallback((u) => {
+    setUserState(u);
+    if (u) tokenStore.setUser(u);
+  }, []);
+
   useEffect(() => {
     if (!tokenStore.get()) { setReady(true); return; }
-    api('/auth/me').then((d) => setUser(d.user)).catch(() => tokenStore.clear()).finally(() => setReady(true));
-  }, []);
+    const cached = tokenStore.getUser();
+    if (cached) { setUserState(cached); setReady(true); }
+    api('/auth/me')
+      .then((d) => setUser(d.user))
+      .catch((err) => {
+        // Only a real "not signed in" answer ends the session. Network or server hiccups keep you logged in.
+        if (err.status === 401) { tokenStore.clear(); setUserState(null); }
+      })
+      .finally(() => setReady(true));
+  }, [setUser]);
 
   // Any 401 from the API ends the session.
   useEffect(() => {
     const onUnauthorized = () => {
       if (!tokenStore.get()) return;
       tokenStore.clear();
-      setUser(null);
+      setUserState(null);
       qc.clear();
       router.replace('/login?expired=1');
     };
@@ -100,31 +115,31 @@ function AuthProvider({ children }) {
     return () => window.removeEventListener('techof:unauthorized', onUnauthorized);
   }, [qc, router]);
 
-  // Automatic session validation: every 5 minutes and when the tab regains focus.
+  // Quietly refresh the profile every 5 minutes and when the tab regains focus.
   useEffect(() => {
     if (!user) return undefined;
     const check = () => api('/auth/me').then((d) => setUser(d.user)).catch(() => {});
     const id = setInterval(check, 5 * 60_000);
     window.addEventListener('focus', check);
     return () => { clearInterval(id); window.removeEventListener('focus', check); };
-  }, [user?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?._id, setUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const value = useMemo(() => ({
     user, ready, setUser,
-    async login({ identifier, password, remember }) {
-      const d = await api('/auth/login', { method: 'POST', body: { identifier, password, remember } });
-      tokenStore.set(d.token, remember);
+    async login({ identifier, password }) {
+      const d = await api('/auth/login', { method: 'POST', body: { identifier, password, remember: true } });
+      tokenStore.set(d.token);
       setUser(d.user);
       return d.user;
     },
     async logout() {
       try { await api('/auth/logout', { method: 'POST' }); } catch {}
       tokenStore.clear();
-      setUser(null);
+      setUserState(null);
       qc.clear();
       router.replace('/login');
     },
-  }), [user, ready, qc, router]);
+  }), [user, ready, qc, router, setUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -224,10 +239,11 @@ export default function Providers({ children }) {
     const theme = localStorage.getItem('techof_theme') || 'dark';
     applyTheme(theme);
     applyMotion(localStorage.getItem('techof_reduce_motion') === 'true');
+    const stopUnlock = unlockAudio();
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const onChange = () => { if ((localStorage.getItem('techof_theme') || 'dark') === 'system') applyTheme('system'); };
     mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
+    return () => { mq.removeEventListener('change', onChange); stopUnlock?.(); };
   }, []);
 
   return (

@@ -12,7 +12,6 @@ import Icon from '@/components/ui/Icon';
 const schema = z.object({
   identifier: z.string().trim().min(1, 'Enter your email or username.'),
   password: z.string().min(1, 'Enter your password.'),
-  remember: z.boolean(),
 });
 
 const POINTS = [
@@ -28,7 +27,7 @@ function LoginInner() {
   const root = useRef(null);
   const [show, setShow] = useState(false);
   const [error, setError] = useState('');
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(schema), defaultValues: { identifier: '', password: '', remember: true } });
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(schema), defaultValues: { identifier: '', password: '' } });
 
   useEffect(() => { if (ready && user) router.replace('/dashboard'); }, [ready, user, router]);
 
@@ -41,10 +40,12 @@ function LoginInner() {
       tl.from('.brand-mark', { scale: 0.6, opacity: 0, rotate: -12, duration: 0.7 })
         .from('.hero-line', { y: 36, opacity: 0, stagger: 0.12, duration: 0.8 }, '-=0.35')
         .from('.hero-point', { x: -24, opacity: 0, stagger: 0.1, duration: 0.6 }, '-=0.4')
-        .from('.login-card', { y: 40, opacity: 0, scale: 0.97, duration: 0.8 }, 0.25)
-        .from('.login-field', { y: 14, opacity: 0, stagger: 0.07, duration: 0.5 }, '-=0.5');
+        .from('.login-card', { y: 40, opacity: 0, scale: 0.97, duration: 0.8, clearProps: 'opacity,transform' }, 0.25)
+        .from('.login-field', { y: 14, opacity: 0, stagger: 0.07, duration: 0.5, clearProps: 'opacity,transform' }, '-=0.5');
     }, root);
-    return () => ctx.revert();
+    // Safety net: whatever happens to the animation, the form is always visible after 2.5s.
+    const safety = setTimeout(() => gsap.set('.login-card, .login-field', { clearProps: 'opacity,transform,visibility' }), 2500);
+    return () => { clearTimeout(safety); ctx.revert(); };
   }, []);
 
   async function onSubmit(v) {
@@ -95,7 +96,7 @@ function LoginInner() {
           {error && <p role="alert" className="mb-5 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">{error}</p>}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
             <Field className="login-field" label="Email / Username" error={errors.identifier?.message}>
-              <div className="relative"><Icon name="mail" className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" /><input className="input pl-10" autoComplete="username" placeholder="sabbir or sabbir@techof.dev" autoFocus {...register('identifier')} /></div>
+              <div className="relative"><Icon name="mail" className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" /><input className="input pl-10" autoComplete="username" placeholder="username or email" autoFocus {...register('identifier')} /></div>
             </Field>
             <Field className="login-field" label="Password" error={errors.password?.message}>
               <div className="relative">
@@ -104,10 +105,7 @@ function LoginInner() {
                 <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-muted hover:text-ink" aria-label={show ? 'Hide password' : 'Show password'}><Icon name={show ? 'eyeOff' : 'eye'} /></button>
               </div>
             </Field>
-            <label className="login-field flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-muted">
-              <input type="checkbox" className="h-4 w-4 rounded border-line accent-[rgb(var(--accent))]" {...register('remember')} /> Remember this session
-            </label>
-            <button className="bg-blue-500 flex items-center gap-2 justify-center rounded-lg  login-field w-full !py-3" disabled={isSubmitting}>{isSubmitting ? <><Spinner />Signing in…</> : <>Sign in<Icon name="arrow" /></>}</button>
+            <button type="submit" className="btn-primary w-full !py-3" disabled={isSubmitting}>{isSubmitting ? <><Spinner />Signing in…</> : <>Sign in<Icon name="arrow" /></>}</button>
           </form>
         </div>
       </section>

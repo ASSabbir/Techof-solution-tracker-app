@@ -40,7 +40,7 @@ export default function TaskForm({ defaults, onDone, onCancel }) {
   const { user } = useAuth();
   const { data: users = [] } = useUsers();
   const now = useServerNow();
-  const create = useAction((body) => api('/tasks', { method: 'POST', body }).then((d) => d.task), { success: 'Task created — the countdown has started.' });
+  const create = useAction((body) => api('/tasks', { method: 'POST', body }).then((d) => d.task), { success: 'Task created — the countdown has started.', sound: 'create' });
 
   const { register, handleSubmit, watch, setValue, setError, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
