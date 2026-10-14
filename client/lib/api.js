@@ -1,6 +1,6 @@
 import { setServerTime } from './clock';
 
-const BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+const BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://techof-task.vercel.app/api').replace(/\/$/, '');
 const KEY = 'techof_token';
 const USER_KEY = 'techof_user';
 

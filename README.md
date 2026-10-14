@@ -21,7 +21,7 @@ docker compose up -d                       # local MongoDB on :27017
 # 3. create the three users (+ optional realistic demo data)
 npm run seed:demo                          # or: npm run seed   (users only)
 
-# 4. run API (http://localhost:5000) and web app (http://localhost:3000)
+# 4. run API (https://techof-task.vercel.app) and web app (http://localhost:3000)
 npm run dev
 ```
 

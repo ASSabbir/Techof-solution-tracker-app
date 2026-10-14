@@ -9,12 +9,20 @@ import { useAuth, useUI } from '@/components/contexts';
 import { Avatar, Spinner } from '@/components/ui/primitives';
 import Icon from '@/components/ui/Icon';
 import Notifications from './Notifications';
-
+import Image from "next/image";
 function Brand({ collapsed }) {
   return (
     <Link href="/dashboard" className="flex items-center gap-3 px-2">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-sm font-black text-white shadow-glow dark:text-slate-950" style={{ backgroundImage: 'linear-gradient(135deg, rgb(var(--accent)), rgb(var(--accent-2)))' }}>T</span>
-      {!collapsed && <span className="leading-tight"><span className="block text-sm font-extrabold tracking-tight">TechOf</span><span className="block text-[11px] font-semibold text-muted">Solution Tracker</span></span>}
+
+      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-sm font-black text-white shadow-glow dark:text-slate-950" >
+        <Image
+          src="/logo.png"
+          alt="TechOf Solution Logo"
+          width={25}
+          height={25}
+        />
+      </div>
+      {!collapsed && <span className="leading-tight"><span className="block text-sm font-extrabold tracking-tight">TechOf Solution</span><span className="block text-[11px] font-semibold text-muted"> Tracker</span></span>}
     </Link>
   );
 }
