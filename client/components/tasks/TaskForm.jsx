@@ -8,7 +8,7 @@ import { api } from '@/lib/api';
 import { useServerNow } from '@/lib/clock';
 import { PRIORITY_META } from '@/lib/constants';
 import { fmtDateTime, toLocalInput } from '@/lib/format';
-import { useAction, useUsers } from '@/hooks/queries';
+import { useAction, useProjects, useUsers } from '@/hooks/queries';
 import { useAuth } from '@/components/contexts';
 import { Avatar, Field, Segmented, Spinner } from '@/components/ui/primitives';
 import Icon from '@/components/ui/Icon';
@@ -18,6 +18,7 @@ const schema = z
     title: z.string().trim().min(2, 'Give the task a title.').max(140, 'Keep the title under 140 characters.'),
     description: z.string().max(2000).optional(),
     assignedTo: z.string().min(1, 'Choose who this is for.'),
+    projectId: z.string().optional(),
     priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
     deadlineType: z.enum(['hours', 'days', 'custom']),
     hours: z.union([z.number(), z.nan()]).optional(),
@@ -39,18 +40,23 @@ const DAY_CHIPS = [1, 2, 3, 5, 7, 14];
 export default function TaskForm({ defaults, onDone, onCancel }) {
   const { user } = useAuth();
   const { data: users = [] } = useUsers();
+  const { data: allProjects = [] } = useProjects();
   const now = useServerNow();
   const create = useAction((body) => api('/tasks', { method: 'POST', body }).then((d) => d.task), { success: 'Task created — the countdown has started.', sound: 'create' });
 
   const { register, handleSubmit, watch, setValue, setError, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
-      title: defaults?.title || '', description: '', assignedTo: defaults?.assignedTo || user?._id || '', priority: 'MEDIUM',
+      title: defaults?.title || '', description: '', assignedTo: defaults?.assignedTo || user?._id || '', projectId: defaults?.projectId || '', priority: 'MEDIUM',
       deadlineType: 'hours', hours: 2, days: 1, customAt: toLocalInput(new Date(Date.now() + 24 * 3600_000)),
     },
   });
   const v = watch();
+  const projects = allProjects.filter((p) => !['COMPLETED', 'ARCHIVED'].includes(p.status));
+  const picked = allProjects.find((p) => p._id === v.projectId);
   useEffect(() => { register('assignedTo'); register('priority'); register('deadlineType'); }, [register]);
+  // The project list may still be loading when the form opens from a project page; apply the preset once the options exist.
+  useEffect(() => { if (defaults?.projectId && allProjects.length) setValue('projectId', defaults.projectId); }, [allProjects.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   let preview = null;
   if (v.deadlineType === 'hours' && v.hours > 0) preview = now + v.hours * 3600_000;
@@ -63,7 +69,7 @@ export default function TaskForm({ defaults, onDone, onCancel }) {
         : values.deadlineType === 'days' ? { type: 'days', value: values.days }
           : { type: 'custom', at: new Date(values.customAt).toISOString() };
     try {
-      const task = await create.mutateAsync({ title: values.title, description: values.description || '', assignedTo: values.assignedTo, priority: values.priority, deadline });
+      const task = await create.mutateAsync({ title: values.title, description: values.description || '', assignedTo: values.assignedTo, projectId: values.projectId || null, priority: values.priority, deadline });
       onDone?.(task);
     } catch (err) {
       if (err.fields?.title) setError('title', { message: err.fields.title });
@@ -78,6 +84,22 @@ export default function TaskForm({ defaults, onDone, onCancel }) {
 
       <Field label="Description (optional)" error={errors.description?.message}>
         <textarea className="input min-h-[88px] resize-y" placeholder="Finish responsive version and animation implementation." {...register('description')} />
+      </Field>
+
+      <Field label="Project (optional)" hint={projects.length ? undefined : 'No projects yet — add one from the Projects page.'}>
+        <div className="relative">
+          <select className="input cursor-pointer appearance-none pr-9" {...register('projectId')}>
+            <option value="">No project</option>
+            {projects.map((p) => <option key={p._id} value={p._id}>{p.name}{p.clientName ? ` · ${p.clientName}` : ''}</option>)}
+          </select>
+          <Icon name="down" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+        </div>
+        {picked && (
+          <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-muted">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: picked.color }} />
+            Led by {picked.lead?.name} · {picked.stats.open} open task{picked.stats.open === 1 ? '' : 's'}
+          </p>
+        )}
       </Field>
 
       <Field label="Assign to" error={errors.assignedTo?.message}>

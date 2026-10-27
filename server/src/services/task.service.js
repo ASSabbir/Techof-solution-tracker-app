@@ -7,6 +7,7 @@ const { OPEN_STATUSES, USER_FIELDS } = require('../utils/constants');
 const { fmtDuration } = require('../utils/time');
 const { completionResult, isEarlyFinish, computeScore } = require('../utils/scoring');
 const { getSettings } = require('./settings.service');
+const projects = require('./project.service');
 const activity = require('./activity.service');
 const { notify } = require('./notification.service');
 
@@ -15,6 +16,7 @@ const POPULATE = [
   { path: 'createdBy', select: USER_FIELDS },
   { path: 'assignedTo', select: USER_FIELDS },
   { path: 'completedBy', select: USER_FIELDS },
+  { path: 'projectId', select: 'name color status' },
 ];
 const idOf = (v) => String(v && v._id ? v._id : v);
 
@@ -23,6 +25,8 @@ async function createTask(user, input) {
   const now = new Date();
   const assignee = await User.findOne({ _id: input.assignedTo, status: 'ACTIVE' });
   if (!assignee) throw new AppError('Please choose a valid team member.', 400);
+
+  const project = input.projectId ? await projects.assertOpenForTasks(input.projectId) : null;
 
   const d = input.deadline;
   let deadline;
@@ -39,6 +43,7 @@ async function createTask(user, input) {
     createdBy: user._id,
     assignedTo: assignee._id,
     priority: input.priority,
+    projectId: project ? input.projectId : null,
     status: 'ACTIVE',
     startedAt: now,
     originalDeadline: deadline,
@@ -46,13 +51,13 @@ async function createTask(user, input) {
     originalDuration: Math.round((deadline - now) / 60000),
   });
 
-  const meta = { title: task.title, priority: task.priority, assignedTo: String(assignee._id), deadline: deadline.toISOString() };
-  await activity.log(user._id, 'TASK_CREATED', 'Task', task._id, `${user.name} created “${task.title}”`, meta);
+  const meta = { title: task.title, priority: task.priority, assignedTo: String(assignee._id), deadline: deadline.toISOString(), project: project ? project.name : null };
+  await activity.log(user._id, 'TASK_CREATED', 'Task', task._id, `${user.name} created “${task.title}”${project ? ` in ${project.name}` : ''}`, meta);
   if (String(assignee._id) !== String(user._id)) {
     await activity.log(user._id, 'TASK_ASSIGNED', 'Task', task._id, `${user.name} assigned “${task.title}” to ${assignee.name}`, meta);
     await notify(assignee._id, {
       type: 'TASK_ASSIGNED', title: 'New task assigned',
-      message: `${user.name} assigned you “${task.title}”.`, entityType: 'Task', entityId: task._id, link: `/tasks/${task._id}`,
+      message: `${user.name} assigned you “${task.title}”${project ? ` (${project.name})` : ''}.`, entityType: 'Task', entityId: task._id, link: `/tasks/${task._id}`,
     });
   }
   await activity.log(user._id, 'DEADLINE_SET', 'Task', task._id, `Deadline set for “${task.title}”`, { deadline: deadline.toISOString() });
@@ -83,6 +88,7 @@ async function completeTask(user, taskId) {
     { new: true }
   );
   if (!updated) throw new AppError('This task was just updated. Please refresh and try again.', 409);
+  await projects.countCompletion(updated.projectId);
 
   await TaskExtension.updateMany({ taskId: task._id, status: 'PENDING' }, { $set: { status: 'CANCELLED', cancelledAt: now } });
   await activity.log(user._id, 'TASK_COMPLETED', 'Task', task._id, `${user.name} completed “${task.title}”`, {
@@ -131,6 +137,14 @@ async function updateTask(user, taskId, patch) {
     if (patch[key] !== undefined && patch[key] !== task[key]) {
       before[key] = task[key];
       set[key] = patch[key];
+    }
+  }
+  if (patch.projectId !== undefined) {
+    const next = patch.projectId || null;
+    if (String(next || '') !== String(task.projectId || '')) {
+      if (next) await projects.assertOpenForTasks(next);
+      before.projectId = task.projectId ? String(task.projectId) : null;
+      set.projectId = next;
     }
   }
   if (!Object.keys(set).length) return task;
@@ -360,6 +374,7 @@ async function decorate(tasks, viewer, { withTimeline = false } = {}) {
     const isCreator = viewerId && idOf(o.createdBy) === viewerId;
     const out = {
       ...o,
+      project: o.projectId && o.projectId.name ? { _id: o.projectId._id, name: o.projectId.name, color: o.projectId.color, status: o.projectId.status } : null,
       remainingMs: open ? remainingMs : null,
       overdueMs: open && remainingMs < 0 ? -remainingMs : 0,
       isPastDeadline: open && remainingMs <= 0,

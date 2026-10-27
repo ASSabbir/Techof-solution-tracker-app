@@ -9,6 +9,7 @@ const att = require('../controllers/attendance.controller');
 const leave = require('../controllers/leave.controller');
 const misc = require('../controllers/misc.controller');
 const meetings = require('../controllers/meetings.controller');
+const projects = require('../controllers/projects.controller');
 
 const api = express.Router();
 
@@ -97,6 +98,14 @@ meetR.patch('/:id', meetings.update);
 meetR.post('/:id/rsvp', meetings.rsvp);
 meetR.post('/:id/cancel', meetings.cancel);
 api.use('/meetings', meetR);
+
+/* /api/projects */
+const projR = express.Router();
+projR.get('/', projects.list);
+projR.post('/', projects.create);
+projR.get('/:id', projects.get);
+projR.patch('/:id', projects.update);
+api.use('/projects', projR);
 
 api.get('/leaderboard', misc.leaderboard);
 api.get('/dashboard', misc.dashboard);

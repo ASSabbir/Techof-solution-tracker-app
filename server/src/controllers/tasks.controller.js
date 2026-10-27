@@ -29,6 +29,7 @@ async function buildFilter(q, { mineOf } = {}) {
   if (mineOf) and.push({ assignedTo: mineOf });
   else if (q.assignedTo) and.push({ assignedTo: q.assignedTo });
   if (q.createdBy) and.push({ createdBy: q.createdBy });
+  if (q.projectId) and.push({ projectId: q.projectId === 'none' ? null : q.projectId });
   if (q.priority) and.push({ priority: { $in: csvList(q.priority) } });
   if (q.status) and.push({ status: { $in: csvList(q.status) } });
   if (q.search) {

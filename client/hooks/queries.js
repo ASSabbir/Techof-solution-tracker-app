@@ -41,6 +41,12 @@ export const useAttendanceDay = (date) =>
 export const useMeetings = () =>
   useQuery({ queryKey: ['meetings'], queryFn: () => api('/meetings').then((d) => d.meetings), refetchInterval: 30_000 });
 
+export const useProjects = () =>
+  useQuery({ queryKey: ['projects'], queryFn: () => api('/projects').then((d) => d.projects), refetchInterval: 45_000 });
+
+export const useProject = (id) =>
+  useQuery({ queryKey: ['project', id], queryFn: () => api(`/projects/${id}`).then((d) => d.project), enabled: !!id, refetchInterval: 30_000 });
+
 export const useLeaves = (scope) =>
   useQuery({ queryKey: ['leave', scope], queryFn: () => api('/leave', { params: { scope } }).then((d) => d.leaves), refetchInterval: 45_000 });
 

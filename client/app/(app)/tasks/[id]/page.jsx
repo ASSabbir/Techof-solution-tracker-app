@@ -14,6 +14,7 @@ import Countdown, { useTaskTiming } from '@/components/tasks/Countdown';
 import ExtensionInfo from '@/components/tasks/ExtensionInfo';
 import { Ledger, Timeline } from '@/components/tasks/Ledger';
 import { PriorityBadge, ResultBadge, StatusBadge } from '@/components/tasks/badges';
+import { ProjectChip } from '@/components/projects/parts';
 
 function Body({ task }) {
   const ui = useUI();
@@ -43,7 +44,7 @@ function Body({ task }) {
       <button onClick={() => router.back()} data-anim className="btn-ghost -ml-3"><Icon name="back" />Back</button>
 
       <div ref={heroRef} data-anim className={`card card-pad ${completed ? 'border-success/30' : overdue ? 'border-danger/35' : ''}`}>
-        <div className="flex flex-wrap items-center gap-2"><PriorityBadge priority={task.priority} /><StatusBadge status={task.status} />{completed && <ResultBadge result={task.completionResult} />}</div>
+        <div className="flex flex-wrap items-center gap-2"><PriorityBadge priority={task.priority} /><StatusBadge status={task.status} />{completed && <ResultBadge result={task.completionResult} />}<ProjectChip project={task.project} link /></div>
         <h1 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-4xl">{completed && <Icon name="ok" className="mr-2 inline h-7 w-7 -translate-y-0.5 text-success" />}{task.title}</h1>
         {task.description && <p className="mt-3 max-w-3xl whitespace-pre-wrap text-muted">{task.description}</p>}
 

@@ -39,14 +39,15 @@ const taskSchema = new mongoose.Schema(
     // Closed tasks are removed automatically 30 days after they close (MongoDB TTL on this field).
     expireAt: Date,
 
-    // Room for the future Projects module.
-    projectId: { type: ObjectId, default: null },
+    // Optional: which project this task belongs to.
+    projectId: { type: ObjectId, ref: 'Project', default: null },
   },
   { timestamps: true }
 );
 
 taskSchema.index({ assignedTo: 1, status: 1 });
 taskSchema.index({ createdBy: 1 });
+taskSchema.index({ projectId: 1, status: 1 });
 taskSchema.index({ status: 1, currentDeadline: 1 });
 taskSchema.index({ completedAt: -1 });
 taskSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 });

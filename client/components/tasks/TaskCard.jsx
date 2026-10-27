@@ -13,6 +13,7 @@ import Icon from '@/components/ui/Icon';
 import Countdown, { useTaskTiming } from './Countdown';
 import ExtensionInfo from './ExtensionInfo';
 import { PriorityBadge, StatusBadge, ResultBadge } from './badges';
+import { ProjectChip } from '@/components/projects/parts';
 
 export default function TaskCard({ task, showAssignee = false }) {
   const ui = useUI();
@@ -50,6 +51,7 @@ export default function TaskCard({ task, showAssignee = false }) {
         <PriorityBadge priority={task.priority} />
         <StatusBadge status={overdue && task.status !== 'EXTENSION_REQUESTED' ? 'OVERDUE' : task.status} />
         {completed && <ResultBadge result={task.completionResult} />}
+        <ProjectChip project={task.project} link />
         {showAssignee && (
           <span className="ml-auto flex items-center gap-2 text-xs font-semibold text-muted">
             <Avatar user={task.assignedTo} size="xs" />{task.assignedTo?.name}

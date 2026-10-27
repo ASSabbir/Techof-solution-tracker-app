@@ -18,7 +18,7 @@ export default function ActivityPage() {
       <PageHeader eyebrow="Audit trail" title="Activity" subtitle="An append-only record of everything that happened. Entries can’t be edited or removed." />
       <div className="mb-5 flex flex-wrap gap-3" data-anim>
         <select className="input !w-auto" value={userId} onChange={(e) => { setUserId(e.target.value); setPage(1); }}><option value="">Everyone</option>{users.map((u) => <option key={u._id} value={u._id}>{u.name}</option>)}</select>
-        <select className="input !w-auto" value={entityType} onChange={(e) => { setEntityType(e.target.value); setPage(1); }}><option value="">All activity</option><option value="Task">Tasks</option><option value="Attendance">Attendance</option><option value="Leave">Leave</option><option value="Meeting">Meetings</option><option value="Settings">Settings</option></select>
+        <select className="input !w-auto" value={entityType} onChange={(e) => { setEntityType(e.target.value); setPage(1); }}><option value="">All activity</option><option value="Task">Tasks</option><option value="Attendance">Attendance</option><option value="Leave">Leave</option><option value="Meeting">Meetings</option><option value="Project">Projects</option><option value="Settings">Settings</option></select>
       </div>
       {isError ? <ErrorState onRetry={refetch} /> : isLoading ? <Skeleton className="h-96" /> : (
         <div className="card card-pad" data-anim>

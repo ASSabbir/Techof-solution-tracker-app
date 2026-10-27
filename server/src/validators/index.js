@@ -1,5 +1,5 @@
 const { z } = require('zod');
-const { PRIORITIES } = require('../utils/constants');
+const { PRIORITIES, PROJECT_STATUSES } = require('../utils/constants');
 
 const oid = z.string().regex(/^[a-fA-F0-9]{24}$/, 'That request referenced something invalid.');
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the format YYYY-MM-DD.');
@@ -25,11 +25,15 @@ const deadline = z.discriminatedUnion('type', [
   z.object({ type: z.literal('custom'), at: z.string().datetime({ offset: true }) }),
 ]);
 
+// Optional project: an id, or null / empty for "no project".
+const projectRef = z.union([oid, z.literal(''), z.null()]).optional();
+
 const createTask = z.object({
   title: z.string().trim().min(2, 'Give the task a title.').max(140),
   description: z.string().trim().max(2000).optional().default(''),
   assignedTo: oid,
   priority: z.enum(PRIORITIES).default('MEDIUM'),
+  projectId: projectRef,
   deadline,
 });
 
@@ -39,6 +43,7 @@ const updateTask = z
     title: z.string().trim().min(2).max(140).optional(),
     description: z.string().trim().max(2000).optional(),
     priority: z.enum(PRIORITIES).optional(),
+    projectId: projectRef,
   })
   .strict('Deadlines, status and completion details can’t be edited. Request an extension instead.');
 
@@ -53,6 +58,7 @@ const taskQuery = z.object({
   search: z.string().trim().max(100).optional(),
   assignedTo: oid.optional(),
   createdBy: oid.optional(),
+  projectId: z.union([oid, z.literal('none')]).optional(),
   status: csv,
   priority: csv,
   from: z.string().optional(),
@@ -114,7 +120,7 @@ const settings = z
 
 const activityQuery = z.object({
   userId: oid.optional(),
-  entityType: z.enum(['Task', 'Attendance', 'Leave', 'User', 'Settings', 'Meeting']).optional(),
+  entityType: z.enum(['Task', 'Attendance', 'Leave', 'User', 'Settings', 'Meeting', 'Project']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(30),
 });
@@ -144,10 +150,38 @@ const meetingRsvp = z.object({
   note: z.string().trim().max(200).optional().default(''),
 });
 
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Pick one of the colours.');
+const optionalDate = z.union([dateStr, z.literal(''), z.null()]).optional();
+const projectBase = {
+  name: z.string().trim().min(2, 'Give the project a name.').max(100),
+  clientName: z.string().trim().max(100),
+  description: z.string().trim().max(2000),
+  status: z.enum(PROJECT_STATUSES),
+  priority: z.enum(PRIORITIES),
+  color: hexColor,
+  lead: oid,
+  startDate: optionalDate,
+  dueDate: optionalDate,
+  link: z.string().trim().max(300).refine((s) => s === '' || /^https?:\/\//i.test(s), 'Start the link with http:// or https://'),
+  tags: z.array(z.string().trim().min(1).max(24)).max(8),
+};
+const projectCreate = z.object({
+  ...projectBase,
+  clientName: projectBase.clientName.optional().default(''),
+  description: projectBase.description.optional().default(''),
+  status: projectBase.status.default('ACTIVE'),
+  priority: projectBase.priority.default('MEDIUM'),
+  color: projectBase.color.default('#6366f1'),
+  link: projectBase.link.optional().default(''),
+  tags: projectBase.tags.optional().default([]),
+});
+const projectUpdate = z.object(projectBase).partial().strict();
+
 const leaderboardQuery = z.object({ period: z.enum(['all', 'month', 'week']).default('all') });
 
 module.exports = {
   oid, login, changePassword, createTask, updateTask, requestExtension, decision, cancelTask,
   taskQuery, leaveCreate, leaveQuery, clockIn, clockOut, historyQuery, profile, settings, activityQuery,
   leaderboardQuery, monthStr, dateStr, meetingCreate, meetingUpdate, meetingRsvp,
+  projectCreate, projectUpdate,
 };

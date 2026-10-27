@@ -66,15 +66,26 @@ export const TONE = {
 export const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
   { href: '/tasks/my', label: 'My Tasks', icon: 'mine' },
-  { href: '/tasks/team', label: 'Team Tasks', icon: 'team' },
+  { href: '/tasks/team', label: 'All Tasks', icon: 'team' },
+  { href: '/attendance', label: 'Attendance', icon: 'clock' },
+  { href: '/projects', label: 'Projects', icon: 'folder' },
   { href: '/leaderboard', label: 'Leaderboard', icon: 'trophy' },
   { href: '/meetings', label: 'Meetings', icon: 'meeting' },
-  { href: '/attendance', label: 'Attendance', icon: 'clock' },
+  
   { href: '/leave', label: 'Leave', icon: 'leave' },
   { href: '/activity', label: 'Activity', icon: 'activity' },
   { href: '/profile', label: 'Profile', icon: 'profile' },
   { href: '/settings', label: 'Settings', icon: 'settings' },
 ];
+
+export const PROJECT_STATUS = {
+  PLANNING: { label: 'Planning', tone: 'info' },
+  ACTIVE: { label: 'Active', tone: 'success' },
+  ON_HOLD: { label: 'On hold', tone: 'warning' },
+  COMPLETED: { label: 'Completed', tone: 'accent' },
+  ARCHIVED: { label: 'Archived', tone: 'muted' },
+};
+export const PROJECT_COLORS = ['#6366f1', '#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b', '#f43f5e', '#14b8a6', '#64748b'];
 
 export const MEETING_MODES = [
   { value: 'ONLINE', label: 'Online', icon: 'video', placeholder: 'Meeting link (Google Meet, Zoom…)' },

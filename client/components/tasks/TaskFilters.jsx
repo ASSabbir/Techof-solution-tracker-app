@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useUsers } from '@/hooks/queries';
+import { useProjects, useUsers } from '@/hooks/queries';
 import Icon from '@/components/ui/Icon';
 
-export const EMPTY_FILTERS = { search: '', assignedTo: '', status: '', priority: '', completion: '', extension: '', from: '', to: '' };
+export const EMPTY_FILTERS = { search: '', assignedTo: '', projectId: '', status: '', priority: '', completion: '', extension: '', from: '', to: '' };
 
 // Turn UI filter state into API params (dates -> ISO range in the viewer's local time).
 export function toParams(f) {
@@ -22,6 +22,7 @@ const Select = ({ value, onChange, children, label }) => (
 
 export default function TaskFilters({ value, onChange, showUser = false }) {
   const { data: users = [] } = useUsers();
+  const { data: projects = [] } = useProjects();
   const [text, setText] = useState(value.search);
   const [open, setOpen] = useState(false);
   const set = (k) => (v) => onChange({ ...value, [k]: v });
@@ -55,6 +56,11 @@ export default function TaskFilters({ value, onChange, showUser = false }) {
               {users.map((u) => <option key={u._id} value={u._id}>{u.name}</option>)}
             </Select>
           )}
+          <Select label="Project" value={value.projectId} onChange={set('projectId')}>
+            <option value="">Project: any</option>
+            <option value="none">No project</option>
+            {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+          </Select>
           <Select label="Status" value={value.status} onChange={set('status')}>
             <option value="">Status: any</option>
             {['ACTIVE', 'EXTENDED', 'EXTENSION_REQUESTED', 'OVERDUE', 'COMPLETED', 'CANCELLED'].map((s) => <option key={s} value={s}>{s.replace('_', ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase())}</option>)}

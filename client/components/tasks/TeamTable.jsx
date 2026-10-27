@@ -5,6 +5,7 @@ import { fmtClock, fmtDateTime, fmtOverdue, fmtMinutes } from '@/lib/format';
 import { Avatar } from '@/components/ui/primitives';
 import { useTaskTiming } from './Countdown';
 import { PriorityBadge, ResultBadge, StatusBadge } from './badges';
+import { ProjectChip } from '@/components/projects/parts';
 
 function Timing({ task }) {
   const { diff, state, open } = useTaskTiming(task);
@@ -27,6 +28,7 @@ export default function TeamTable({ items }) {
             <tr key={t._id} className="border-b border-line/60 transition last:border-0 hover:bg-surface-2/50">
               <td className="max-w-[18rem] px-4 py-3.5">
                 <Link href={`/tasks/${t._id}`} className="block truncate font-bold hover:text-accent">{t.title}</Link>
+                {t.project && <ProjectChip project={t.project} link className="mt-1 !px-2 !py-0.5 !text-[11px]" />}
                 {t.extensionCount > 0 && <span className="text-[11px] font-semibold text-accent">+{fmtMinutes(t.totalExtensionMinutes)} extra time</span>}
               </td>
               <td className="px-4 py-3.5"><span className="flex items-center gap-2 font-semibold"><Avatar user={t.assignedTo} size="xs" />{t.assignedTo?.name}</span></td>

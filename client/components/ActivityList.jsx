@@ -18,7 +18,7 @@ export default function ActivityList({ items = [] }) {
             </div>
           </div>
         );
-        const href = a.entityType === 'Task' && a.entityId ? `/tasks/${a.entityId}` : a.entityType === 'Meeting' && a.entityId ? `/meetings?open=${a.entityId}` : null;
+        const href = a.entityType === 'Task' && a.entityId ? `/tasks/${a.entityId}` : a.entityType === 'Meeting' && a.entityId ? `/meetings?open=${a.entityId}` : a.entityType === 'Project' && a.entityId ? `/projects/${a.entityId}` : null;
         return <li key={a._id}>{href ? <Link href={href} className="block rounded-lg px-1 transition hover:bg-surface-2/60">{body}</Link> : <div className="px-1">{body}</div>}</li>;
       })}
     </ul>

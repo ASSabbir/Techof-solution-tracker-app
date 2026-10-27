@@ -14,10 +14,11 @@ if (!cached) cached = global.__techofMongo = { conn: null, promise: null, indexe
 //  - finished tasks (and their extension records) disappear 30 days after they close
 //  - notifications disappear after 14 days
 //  - meetings disappear 30 days after they end
+// (Project is listed so its unique-name index exists too.)
 async function ensureCleanupIndexes() {
   if (cached.indexed) return;
   cached.indexed = true;
-  const names = ['ActivityLog', 'Task', 'TaskExtension', 'Notification', 'Meeting'];
+  const names = ['ActivityLog', 'Task', 'TaskExtension', 'Notification', 'Meeting', 'Project'];
   await Promise.all(names.map(async (n) => {
     const model = require(`../models/${n}`);
     try {
