@@ -7,7 +7,7 @@ import Icon from '@/components/ui/Icon';
 const ACTION_ICON = {
   TASK_CREATED: ['plus', 'accent'], TASK_ASSIGNED: ['userCheck', 'info'], DEADLINE_SET: ['timer', 'muted'],
   TASK_UPDATED: ['edit', 'muted'], TASK_OVERDUE: ['no', 'danger'], EXTENSION_REQUESTED: ['hourglass', 'warning'],
-  EXTENSION_APPROVED: ['ok', 'success'], EXTENSION_REJECTED: ['no', 'danger'], TASK_COMPLETED: ['check', 'success'], TASK_CANCELLED: ['ban', 'muted'],
+  EXTENSION_APPROVED: ['ok', 'success'], EXTENSION_REJECTED: ['no', 'danger'], TASK_COMPLETED: ['check', 'success'], TASK_CANCELLED: ['ban', 'muted'], TASK_REOPENED: ['refresh', 'accent'],
 };
 
 // Everything that actually happened, in order. History is append-only on the server.

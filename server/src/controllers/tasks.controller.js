@@ -114,6 +114,12 @@ exports.cancel = asyncHandler(async (req, res) => {
   ok(res, { task: await one(task._id, req.user) });
 });
 
+exports.reopen = asyncHandler(async (req, res) => {
+  const { deadline } = v.reopenTask.parse(req.body || {});
+  const task = await svc.reopenTask(req.user, v.oid.parse(req.params.id), deadline);
+  ok(res, { task: await one(task._id, req.user) });
+});
+
 exports.requestExtension = asyncHandler(async (req, res) => {
   const input = v.requestExtension.parse(req.body);
   const ext = await svc.requestExtension(req.user, v.oid.parse(req.params.id), input);

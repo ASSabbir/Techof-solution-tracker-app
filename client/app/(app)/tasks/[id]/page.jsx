@@ -3,7 +3,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { burst } from '@/lib/motion';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { fmtDateTime } from '@/lib/format';
 import { useEnter } from '@/hooks/useEnter';
 import { useAction, useTask } from '@/hooks/queries';
@@ -15,6 +15,7 @@ import ExtensionInfo from '@/components/tasks/ExtensionInfo';
 import { Ledger, Timeline } from '@/components/tasks/Ledger';
 import { PriorityBadge, ResultBadge, StatusBadge } from '@/components/tasks/badges';
 import { ProjectChip } from '@/components/projects/parts';
+import ReopenModal from '@/components/tasks/ReopenModal';
 
 function Body({ task }) {
   const ui = useUI();
@@ -24,6 +25,7 @@ function Body({ task }) {
   const { state } = useTaskTiming(task);
   const complete = useAction(() => api(`/tasks/${task._id}/complete`, { method: 'POST' }), { success: 'Task completed — nice work!', sound: 'complete' });
   const cancel = useAction((reason) => api(`/tasks/${task._id}/cancel`, { method: 'POST', body: { reason } }), { success: 'Task cancelled.' });
+  const [reopenOpen, setReopenOpen] = useState(false);
   const decide = useAction(({ id, action }) => api(`/extensions/${id}/${action}`, { method: 'PATCH', body: {} }), { success: (_d, v) => (v.action === 'approve' ? 'Extension approved' : 'Extension rejected') });
   const p = task.permissions;
   const overdue = state === 'overdue';
@@ -68,8 +70,11 @@ function Body({ task }) {
             <button className="btn-success" disabled={decide.isPending} onClick={() => decide.mutate({ id: task.pendingExtension._id, action: 'approve' })}>Approve extension</button>
           </>)}
           {p.canCancel && <button className="btn-ghost" onClick={onCancel}><Icon name="ban" />Cancel task</button>}
+          {p.canReopen && <button className="btn-primary" onClick={() => setReopenOpen(true)}><Icon name="refresh" />Reopen task</button>}
         </div>
       </div>
+
+      {p.canReopen && <ReopenModal task={task} open={reopenOpen} onClose={() => setReopenOpen(false)} />}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="card card-pad" data-anim><p className="eyebrow mb-3">Accountability record</p><Ledger task={task} /></div>

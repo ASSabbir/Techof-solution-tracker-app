@@ -52,7 +52,7 @@ function Body({ p }) {
   const [editing, setEditing] = useState(false);
   const setStatus = useAction((status) => api(`/projects/${p._id}`, { method: 'PATCH', body: { status } }), { success: 'Project status updated.' });
   const due = dueInfo(p, now);
-  const closed = ['COMPLETED', 'ARCHIVED'].includes(p.status);
+  const canAddTask = p.status !== 'COMPLETED';
 
   return (
     <div ref={ref} className="space-y-6">
@@ -88,7 +88,7 @@ function Body({ p }) {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          {!closed && <button className="btn-primary" onClick={() => ui.openAddTask({ projectId: p._id })}><Icon name="plus" />Add task</button>}
+          {canAddTask && <button className="btn-primary" onClick={() => ui.openAddTask({ projectId: p._id })}><Icon name="plus" />Add task</button>}
           {p.canManage && (
             <>
               <button className="btn-soft" onClick={() => setEditing(true)}><Icon name="edit" />Edit project</button>

@@ -20,6 +20,18 @@ const POPULATE = [
 ];
 const idOf = (v) => String(v && v._id ? v._id : v);
 
+/* Turns { type: 'hours'|'days'|'custom', ... } into a checked deadline date. */
+function resolveDeadline(d, now) {
+  let deadline;
+  if (d.type === 'hours') deadline = new Date(now.getTime() + d.value * 3600_000);
+  else if (d.type === 'days') deadline = new Date(now.getTime() + d.value * 86_400_000);
+  else deadline = new Date(d.at);
+  if (Number.isNaN(deadline.getTime())) throw new AppError('Please choose a valid deadline.', 400);
+  if (deadline.getTime() < now.getTime() + 60_000) throw new AppError('The deadline must be at least a minute from now.', 400);
+  if (deadline.getTime() - now.getTime() > 366 * 86_400_000) throw new AppError('The deadline is too far in the future.', 400);
+  return deadline;
+}
+
 /* ------------------------------------------------------------------ create */
 async function createTask(user, input) {
   const now = new Date();
@@ -28,14 +40,7 @@ async function createTask(user, input) {
 
   const project = input.projectId ? await projects.assertOpenForTasks(input.projectId) : null;
 
-  const d = input.deadline;
-  let deadline;
-  if (d.type === 'hours') deadline = new Date(now.getTime() + d.value * 3600_000);
-  else if (d.type === 'days') deadline = new Date(now.getTime() + d.value * 86_400_000);
-  else deadline = new Date(d.at);
-  if (Number.isNaN(deadline.getTime())) throw new AppError('Please choose a valid deadline.', 400);
-  if (deadline.getTime() < now.getTime() + 60_000) throw new AppError('The deadline must be at least a minute from now.', 400);
-  if (deadline.getTime() - now.getTime() > 366 * 86_400_000) throw new AppError('The deadline is too far in the future.', 400);
+  const deadline = resolveDeadline(input.deadline, now);
 
   const task = await Task.create({
     title: input.title,
@@ -122,6 +127,43 @@ async function cancelTask(user, taskId, reason) {
     message: `${user.name} cancelled “${task.title}”.`, entityType: 'Task', entityId: task._id, link: `/tasks/${task._id}`,
   }, user._id);
   return updated;
+}
+
+/* ------------------------------------------------------------------ reopen */
+// A cancelled task can be brought back by the person who created it, with a NEW deadline.
+// It starts over: the clock, the deadline and the extension allowance are all reset.
+async function reopenTask(user, taskId, deadlineInput) {
+  const task = await Task.findById(taskId);
+  if (!task) throw new AppError('Task not found.', 404);
+  if (String(task.createdBy) !== String(user._id)) throw new AppError('Only the person who created this task can reopen it.', 403);
+  if (task.status !== 'CANCELLED') throw new AppError('Only cancelled tasks can be reopened.', 409);
+
+  const now = new Date();
+  const deadline = resolveDeadline(deadlineInput, now);
+
+  // The start time and original deadline are protected from normal updates, so this one deliberate reset
+  // goes straight to the collection. The status filter makes sure it only ever happens to a cancelled task.
+  const res = await Task.collection.updateOne(
+    { _id: task._id, status: 'CANCELLED' },
+    {
+      $set: {
+        status: 'ACTIVE', startedAt: now, originalDeadline: deadline, currentDeadline: deadline,
+        originalDuration: Math.round((deadline - now) / 60000),
+        extensionCount: 0, totalExtensionMinutes: 0, remindersSent: [], wasOverdue: false, updatedAt: now,
+      },
+      $unset: { firstOverdueAt: '', cancelledAt: '', cancelledBy: '', cancelReason: '', expireAt: '' },
+    }
+  );
+  if (!res.modifiedCount) throw new AppError('This task was just updated. Please refresh and try again.', 409);
+  // Cancelling scheduled the old extension records for deletion too; keep them while the task is alive.
+  await TaskExtension.updateMany({ taskId: task._id }, { $unset: { expireAt: 1 } });
+
+  await activity.log(user._id, 'TASK_REOPENED', 'Task', task._id, `${user.name} reopened “${task.title}” with a new deadline`, { deadline: deadline.toISOString() });
+  await notify(task.assignedTo, {
+    type: 'TASK_REOPENED', title: 'Task reopened',
+    message: `${user.name} reopened “${task.title}” with a new deadline.`, entityType: 'Task', entityId: task._id, link: `/tasks/${task._id}`,
+  }, user._id);
+  return Task.findById(task._id);
 }
 
 /* ------------------------------------------------------------------ update */
@@ -367,7 +409,7 @@ async function decorate(tasks, viewer, { withTimeline = false } = {}) {
   const viewerId = viewer ? String(viewer._id) : null;
   return list.map((o) => {
     const open = OPEN_STATUSES.includes(o.status);
-    const history = byTask.get(String(o._id)) || [];
+    const history = (byTask.get(String(o._id)) || []).filter((e) => new Date(e.requestedAt) >= new Date(o.startedAt)); // records from before a reopen stay in the log, not on the task
     const pending = history.find((e) => e.status === 'PENDING') || null;
     const remainingMs = new Date(o.currentDeadline).getTime() - now.getTime();
     const isAssignee = viewerId && idOf(o.assignedTo) === viewerId;
@@ -385,6 +427,7 @@ async function decorate(tasks, viewer, { withTimeline = false } = {}) {
         canComplete: !!(isAssignee && open),
         canRequestExtension: !!(isAssignee && EXTENDABLE.includes(o.status) && o.extensionCount < settings.maxExtensionsPerTask),
         canCancel: !!(isCreator && open),
+        canReopen: !!(isCreator && o.status === 'CANCELLED'),
         canEdit: !!(isCreator && open),
         canDecideExtension: !!(pending && viewerId && String(idOf(pending.requestedBy)) !== viewerId &&
           (idOf(o.createdBy) === viewerId || idOf(o.createdBy) === idOf(pending.requestedBy))),
@@ -396,6 +439,6 @@ async function decorate(tasks, viewer, { withTimeline = false } = {}) {
 }
 
 module.exports = {
-  POPULATE, EXTENDABLE, createTask, completeTask, cancelTask, updateTask,
+  POPULATE, EXTENDABLE, createTask, completeTask, cancelTask, reopenTask, updateTask,
   requestExtension, decideExtension, processOverdue, processReminders, decorate,
 };

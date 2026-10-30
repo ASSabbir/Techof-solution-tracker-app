@@ -23,7 +23,13 @@ async function presenceMap(users) {
       { $match: { assignedTo: { $in: ids }, status: { $in: OPEN_STATUSES } } },
       { $group: { _id: '$assignedTo', active: { $sum: 1 }, overdue: { $sum: { $cond: [overdueCond(now), 1, 0] } } } },
     ]),
-    Attendance.find({ userId: { $in: ids }, exitTime: null, entryTime: { $gte: new Date(now.getTime() - 20 * 3600_000) } }).lean(),
+    Attendance.find({
+      userId: { $in: ids },
+      $or: [
+        { exitTime: null, entryTime: { $gte: new Date(now.getTime() - 20 * 3600_000) } },
+        { overtime: { $elemMatch: { exitTime: null, entryTime: { $gte: new Date(now.getTime() - 8 * 3600_000) } } } },
+      ],
+    }).lean(),
   ]);
   const c = new Map(counts.map((r) => [String(r._id), r]));
   const working = new Set(open.map((r) => String(r.userId)));

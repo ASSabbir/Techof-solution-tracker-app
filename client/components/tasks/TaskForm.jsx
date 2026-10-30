@@ -52,7 +52,10 @@ export default function TaskForm({ defaults, onDone, onCancel }) {
     },
   });
   const v = watch();
-  const projects = allProjects.filter((p) => !['COMPLETED', 'ARCHIVED'].includes(p.status));
+  // Live and archived projects can take tasks; completed ones can't.
+  const liveProjects = allProjects.filter((p) => ['PLANNING', 'ACTIVE', 'ON_HOLD'].includes(p.status));
+  const archivedProjects = allProjects.filter((p) => p.status === 'ARCHIVED');
+  const projects = [...liveProjects, ...archivedProjects];
   const picked = allProjects.find((p) => p._id === v.projectId);
   useEffect(() => { register('assignedTo'); register('priority'); register('deadlineType'); }, [register]);
   // The project list may still be loading when the form opens from a project page; apply the preset once the options exist.
@@ -90,7 +93,8 @@ export default function TaskForm({ defaults, onDone, onCancel }) {
         <div className="relative">
           <select className="input cursor-pointer appearance-none pr-9" {...register('projectId')}>
             <option value="">No project</option>
-            {projects.map((p) => <option key={p._id} value={p._id}>{p.name}{p.clientName ? ` · ${p.clientName}` : ''}</option>)}
+            {liveProjects.length > 0 && <optgroup label="Live projects">{liveProjects.map((p) => <option key={p._id} value={p._id}>{p.name}{p.clientName ? ` · ${p.clientName}` : ''}</option>)}</optgroup>}
+            {archivedProjects.length > 0 && <optgroup label="Archived projects">{archivedProjects.map((p) => <option key={p._id} value={p._id}>{p.name}{p.clientName ? ` · ${p.clientName}` : ''}</option>)}</optgroup>}
           </select>
           <Icon name="down" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         </div>

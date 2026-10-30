@@ -34,14 +34,15 @@ export default function AttendanceHistoryPage() {
         <div className="card"><EmptyState icon="clock" title="No attendance records found." text="Nothing was recorded for this month." /></div>
       ) : (
         <div className="card overflow-x-auto" data-anim>
-          <table className="w-full min-w-[560px] text-left text-sm">
-            <thead><tr className="border-b border-line bg-surface-2/60">{['Date', 'Entry', 'Exit', 'Working', 'Status', 'Note'].map((h) => <th key={h} className="eyebrow px-4 py-3.5">{h}</th>)}</tr></thead>
+          <table className="w-full min-w-[640px] text-left text-sm">
+            <thead><tr className="border-b border-line bg-surface-2/60">{['Date', 'Entry', 'Exit', 'Working', 'Overtime', 'Status', 'Note'].map((h) => <th key={h} className="eyebrow px-4 py-3.5">{h}</th>)}</tr></thead>
             <tbody>
               {rows.map((r) => { const m = ATTENDANCE_META[r.status]; return (
                 <tr key={r._id} className="border-b border-line/60 last:border-0 hover:bg-surface-2/50">
                   <td className="px-4 py-3 font-bold"><Link href={`/attendance/${r.date}`} className="hover:text-accent">{keyToDate(r.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</Link></td>
                   <td className="digit px-4 py-3">{fmtTime(r.entryTime)}</td><td className="digit px-4 py-3">{fmtTime(r.exitTime)}</td>
                   <td className="digit px-4 py-3">{r.workingMinutes ? fmtWorked(r.workingMinutes) : '—'}</td>
+                  <td className="digit px-4 py-3 font-bold text-success/70">{r.overtimeMinutes ? fmtWorked(r.overtimeMinutes) : <span className="font-normal text-muted">—</span>}</td>
                   <td className="px-4 py-3"><Badge tone={m.tone}>{m.label}</Badge></td><td className="px-4 py-3 text-muted">{r.note || (r.overrideLeave ? 'Leave override' : '')}</td>
                 </tr>); })}
             </tbody>

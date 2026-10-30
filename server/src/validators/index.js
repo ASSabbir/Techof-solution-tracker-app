@@ -53,6 +53,7 @@ const requestExtension = z.object({
 });
 const decision = z.object({ note: z.string().trim().max(300).optional().default('') });
 const cancelTask = z.object({ reason: z.string().trim().max(300).optional().default('') });
+const reopenTask = z.object({ deadline });
 
 const taskQuery = z.object({
   search: z.string().trim().max(100).optional(),
@@ -180,7 +181,7 @@ const projectUpdate = z.object(projectBase).partial().strict();
 const leaderboardQuery = z.object({ period: z.enum(['all', 'month', 'week']).default('all') });
 
 module.exports = {
-  oid, login, changePassword, createTask, updateTask, requestExtension, decision, cancelTask,
+  oid, login, changePassword, createTask, updateTask, requestExtension, decision, cancelTask, reopenTask,
   taskQuery, leaveCreate, leaveQuery, clockIn, clockOut, historyQuery, profile, settings, activityQuery,
   leaderboardQuery, monthStr, dateStr, meetingCreate, meetingUpdate, meetingRsvp,
   projectCreate, projectUpdate,

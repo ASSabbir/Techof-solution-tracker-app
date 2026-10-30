@@ -1,5 +1,5 @@
 'use client';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import clsx from 'clsx';
 import { api } from '@/lib/api';
@@ -14,12 +14,14 @@ import Countdown, { useTaskTiming } from './Countdown';
 import ExtensionInfo from './ExtensionInfo';
 import { PriorityBadge, StatusBadge, ResultBadge } from './badges';
 import { ProjectChip } from '@/components/projects/parts';
+import ReopenModal from './ReopenModal';
 
 export default function TaskCard({ task, showAssignee = false }) {
   const ui = useUI();
   const ref = useRef(null);
   const { now, state, open } = useTaskTiming(task);
   const complete = useAction(() => api(`/tasks/${task._id}/complete`, { method: 'POST' }), { success: 'Task completed — nice work!', sound: 'complete' });
+  const [reopenOpen, setReopenOpen] = useState(false);
   const decide = useAction(({ id, action }) => api(`/extensions/${id}/${action}`, { method: 'PATCH', body: {} }), {
     success: (_d, v) => (v.action === 'approve' ? 'Extension approved' : 'Extension rejected'),
   });
@@ -99,6 +101,11 @@ export default function TaskCard({ task, showAssignee = false }) {
             <Icon name="timer" className="h-3.5 w-3.5" />Request Extension
           </button>
         )}
+        {task.permissions?.canReopen && (
+          <button onClick={() => setReopenOpen(true)} className="btn-primary btn-sm">
+            <Icon name="refresh" className="h-3.5 w-3.5" />Reopen
+          </button>
+        )}
         {task.permissions?.canDecideExtension && pending && (
           <>
             <button onClick={() => decide.mutate({ id: pending._id, action: 'reject' })} disabled={decide.isPending} className="btn-danger btn-sm">Reject</button>
@@ -106,6 +113,7 @@ export default function TaskCard({ task, showAssignee = false }) {
           </>
         )}
       </div>
+      {task.permissions?.canReopen && <ReopenModal task={task} open={reopenOpen} onClose={() => setReopenOpen(false)} />}
     </article>
   );
 }

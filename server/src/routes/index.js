@@ -57,6 +57,7 @@ tasksR.get('/:id', tasks.get);
 tasksR.patch('/:id', tasks.update);
 tasksR.post('/:id/complete', tasks.complete);
 tasksR.post('/:id/cancel', tasks.cancel);
+tasksR.post('/:id/reopen', tasks.reopen);
 tasksR.post('/:id/extensions', tasks.requestExtension);
 tasksR.get('/:id/extensions', tasks.listExtensions);
 api.use('/tasks', tasksR);

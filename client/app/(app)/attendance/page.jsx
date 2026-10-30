@@ -27,9 +27,12 @@ function TeamToday() {
             return (
               <tr key={r.user._id} className="border-b border-line/60 last:border-0">
                 <td className="px-5 py-3"><span className="flex items-center gap-2.5 font-bold"><Avatar user={r.user} size="xs" />{r.user.name}</span></td>
-                <td className="digit px-2 py-3">{fmtTime(r.record?.entryTime)}</td>
-                <td className="digit px-2 py-3">{fmtTime(r.record?.exitTime)}</td>
-                <td className="px-5 py-3 text-right">{meta ? <Badge tone={meta.tone}>{meta.label}</Badge> : <span className="text-xs text-muted">{data.isWorkingDay ? 'Not clocked in' : 'Day off'}</span>}</td>
+                <td className="digit px-2 py-3">{fmtTime(r.record?.entryTime || r.record?.overtime?.[0]?.entryTime)}</td>
+                <td className="digit px-2 py-3">{fmtTime(r.record?.exitTime || (r.record?.overtime?.length ? r.record.overtime[r.record.overtime.length - 1].exitTime : null))}</td>
+                <td className="px-5 py-3 text-right">
+                  {meta ? <Badge tone={meta.tone}>{meta.label}</Badge> : <span className="text-xs text-muted">{data.isWorkingDay ? 'Not clocked in' : 'Day off'}</span>}
+                  {r.record?.overtimeMinutes > 0 && <span className="mt-1 block text-[11px] font-bold text-success/70">+{fmtWorked(r.record.overtimeMinutes)} overtime</span>}
+                </td>
               </tr>
             );
           })}
@@ -79,10 +82,11 @@ export default function AttendancePage() {
                 <Stat label="Leave" value={st.leave} tone="info" icon="leave" />
                 <Stat label="Absent" value={st.absent} tone="danger" icon="no" />
               </div>
-              <div className="card card-pad grid grid-cols-3 gap-4" data-anim>
+              <div className="card card-pad grid grid-cols-2 gap-4 sm:grid-cols-4" data-anim>
                 <div><p className="eyebrow">Attendance rate</p><p className="digit mt-1.5 text-2xl font-extrabold">{st.attendanceRate == null ? '—' : `${st.attendanceRate}%`}</p></div>
                 <div><p className="eyebrow">Avg entry</p><p className="digit mt-1.5 text-2xl font-extrabold">{minutesToClock(st.avgEntryMinutes)}</p></div>
                 <div><p className="eyebrow">Avg working</p><p className="digit mt-1.5 text-2xl font-extrabold">{st.avgWorkingMinutes ? fmtWorked(st.avgWorkingMinutes) : '—'}</p></div>
+                <div><p className="eyebrow">Overtime</p><p className="digit mt-1.5 text-2xl font-extrabold text-success/70">{st.overtimeMinutes ? fmtWorked(st.overtimeMinutes) : '—'}</p></div>
               </div>
             </>
           )}

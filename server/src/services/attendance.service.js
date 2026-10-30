@@ -17,39 +17,82 @@ function stateOf(rec) {
   if (!rec) return 'NOT_STARTED';
   if (rec.entryTime && !rec.exitTime) return 'WORKING';
   if (rec.entryTime && rec.exitTime) return 'COMPLETED';
-  return rec.status; // LEAVE / ABSENT
+  return rec.status; // LEAVE / ABSENT / OVERTIME
 }
 
-/* If someone forgets to clock out, close the record at their shift end (4h grace). */
+// Forgotten clock-outs are closed automatically:
+//  - main shift: 5 hours after the shift ends, recorded as if they left at shift end
+//  - overtime session: 5 hours after it started, recorded as a 5 hour session
+const LIMIT_MS = 5 * HOUR;
+
+/* Every unfinished session of one person: the main shift and/or overtime sessions. */
+async function openSessions(userId) {
+  const recs = await Attendance.find({
+    userId,
+    $or: [{ entryTime: { $ne: null }, exitTime: null }, { overtime: { $elemMatch: { exitTime: null } } }],
+  });
+  const out = [];
+  for (const rec of recs) {
+    if (rec.entryTime && !rec.exitTime) out.push({ kind: 'MAIN', rec, entryTime: rec.entryTime });
+    for (const s of rec.overtime || []) if (!s.exitTime) out.push({ kind: 'OVERTIME', rec, session: s, entryTime: s.entryTime });
+  }
+  return out.sort((a, b) => b.entryTime - a.entryTime);
+}
+
 async function closeStale(user, settings, now = new Date()) {
-  const open = await Attendance.find({ userId: user._id, entryTime: { $ne: null }, exitTime: null });
+  const open = await openSessions(user._id);
   if (!open.length) return;
   const shift = S.userShift(user, settings);
-  for (const rec of open) {
-    const w = S.windowFor(rec.date, shift, settings.timezone);
-    const entry = rec.entryTime.getTime();
-    // Shift end if it is after clock-in, otherwise (extra work outside the shift) 8h after clock-in.
-    const autoExit = w.endUtc.getTime() > entry ? w.endUtc.getTime() : entry + 8 * HOUR;
-    if (now.getTime() <= autoExit + 4 * HOUR) continue;
-    const exit = new Date(autoExit);
-    const minutes = Math.max(0, Math.round((autoExit - entry) / 60000));
-    const upd = await Attendance.findOneAndUpdate(
-      { _id: rec._id, exitTime: null },
-      { $set: { exitTime: exit, workingMinutes: minutes, autoClosed: true } },
-      { new: true }
-    );
-    if (upd) await activity.log(user._id, 'CLOCK_OUT_AUTO', 'Attendance', rec._id, `${user.name || 'Someone'} forgot to clock out — closed at shift end`, { date: rec.date, workingMinutes: minutes });
+  for (const o of open) {
+    const entry = o.entryTime.getTime();
+    if (o.kind === 'MAIN') {
+      const w = S.windowFor(o.rec.date, shift, settings.timezone);
+      // Shift end if it is after clock-in, otherwise 8h after clock-in.
+      const autoExit = w.endUtc.getTime() > entry ? w.endUtc.getTime() : entry + 8 * HOUR;
+      if (now.getTime() <= autoExit + LIMIT_MS) continue;
+      const minutes = Math.max(0, Math.round((autoExit - entry) / 60000));
+      const upd = await Attendance.findOneAndUpdate(
+        { _id: o.rec._id, exitTime: null },
+        { $set: { exitTime: new Date(autoExit), workingMinutes: minutes, autoClosed: true } },
+        { new: true }
+      );
+      if (upd) await activity.log(user._id, 'CLOCK_OUT_AUTO', 'Attendance', o.rec._id, `${user.name || 'Someone'} forgot to clock out — closed at shift end`, { date: o.rec.date, workingMinutes: minutes });
+    } else {
+      if (now.getTime() < entry + LIMIT_MS) continue;
+      const minutes = Math.round(LIMIT_MS / 60000);
+      const upd = await Attendance.findOneAndUpdate(
+        { _id: o.rec._id, overtime: { $elemMatch: { _id: o.session._id, exitTime: null } } },
+        { $set: { 'overtime.$.exitTime': new Date(entry + LIMIT_MS), 'overtime.$.minutes': minutes, 'overtime.$.autoClosed': true }, $inc: { overtimeMinutes: minutes } },
+        { new: true }
+      );
+      if (upd) await activity.log(user._id, 'CLOCK_OUT_AUTO', 'Attendance', o.rec._id, `${user.name || 'Someone'} forgot to clock out of overtime — closed after 5 hours`, { date: o.rec.date, overtime: true, minutes });
+    }
   }
 }
 
-function outsideShiftMessage(now, shift, settings) {
-  const next = S.upcomingWindow(now, shift, settings);
-  const early = (settings.clockInEarlyMinutes ?? 60) * 60_000;
-  const range = `${S.hhmm12(shift.start)} – ${S.hhmm12(shift.end)}`;
-  if (!next) return `You can only clock in during your shift (${range}). You can change your shift in Settings.`;
-  const opens = new Date(next.startUtc.getTime() - early);
-  const sameDay = T.dateKey(opens, settings.timezone) === T.dateKey(now, settings.timezone);
-  return `Clock-in for your ${range} shift opens at ${S.fmtInstant(opens, settings.timezone)}${sameDay ? '' : ' tomorrow'}. You can change your shift in Settings.`;
+/* Extra work outside the main shift. It is credited to the attendance date whose 24 hours it falls in. */
+async function startOvertime(user, now, shift, tz) {
+  const day = S.dayFor(now, shift, tz);
+  const session = { entryTime: now, exitTime: null, minutes: 0 };
+  const push = () => Attendance.findOneAndUpdate({ userId: user._id, date: day.date }, { $push: { overtime: session } }, { new: true });
+
+  let rec = await push();
+  if (!rec) {
+    // First thing recorded for this date: an "overtime present" placeholder that holds the session.
+    try {
+      rec = await Attendance.create({ userId: user._id, date: day.date, status: 'OVERTIME', source: 'CLOCK', workingMinutes: 0, overtime: [session] });
+    } catch (err) {
+      if (err.code !== 11000) throw err;
+      rec = await push(); // two requests created the day at the same moment; this one just adds its session
+    }
+  }
+  // A system "absent" mark with no main clock-in becomes overtime-present.
+  if (rec && rec.status === 'ABSENT' && !rec.entryTime) {
+    rec = (await Attendance.findOneAndUpdate({ _id: rec._id, status: 'ABSENT', entryTime: null }, { $set: { status: 'OVERTIME', source: 'CLOCK' } }, { new: true })) || rec;
+  }
+  if (!rec) throw new AppError('Could not start overtime. Please try again.', 500);
+  await activity.log(user._id, 'CLOCK_IN', 'Attendance', rec._id, `${user.name} started overtime`, { date: day.date, overtime: true });
+  return rec;
 }
 
 async function clockIn(user, { override = false } = {}) {
@@ -58,24 +101,18 @@ async function clockIn(user, { override = false } = {}) {
   const now = new Date();
   await closeStale(user, settings, now);
 
+  if ((await openSessions(user._id)).length) throw new AppError('You’re already clocked in. Clock out first.', 409, 'ALREADY_CLOCKED_IN');
+
   const shift = S.userShift(user, settings);
-  const todayK = T.dateKey(now, tz);
   const win = S.currentWindow(now, shift, settings);
+  const existing = win ? await Attendance.findOne({ userId: user._id, date: win.date }) : null;
 
-  let key;
-  let late = false;
-  if (win) {
-    key = win.date; // the date the shift STARTED on (matters for overnight shifts)
-    late = T.isWorkingDay(key, settings) && now.getTime() > win.startUtc.getTime() + settings.lateGraceMinutes * 60_000;
-  } else if (!T.isWorkingDay(todayK, settings)) {
-    key = todayK; // day off: extra work can be logged any time
-  } else {
-    throw new AppError(outsideShiftMessage(now, shift, settings), 409, 'OUTSIDE_SHIFT');
-  }
+  // Anything outside the main shift (or after the main shift is already done) is overtime.
+  if (!win || (existing && existing.entryTime)) return startOvertime(user, now, shift, tz);
+
+  const key = win.date; // the date the shift STARTED on (matters for overnight shifts)
+  const late = T.isWorkingDay(key, settings) && now.getTime() > win.startUtc.getTime() + settings.lateGraceMinutes * 60_000;
   const status = late ? 'LATE' : 'PRESENT';
-
-  const existing = await Attendance.findOne({ userId: user._id, date: key });
-  if (existing && existing.entryTime) throw new AppError('You’ve already clocked in for this shift.', 409, 'ALREADY_CLOCKED_IN');
 
   if (existing && existing.status === 'LEAVE') {
     if (!override) {
@@ -93,14 +130,15 @@ async function clockIn(user, { override = false } = {}) {
   }
 
   if (existing) {
-    // A system-generated ABSENT mark can be corrected by a real clock-in.
+    // An "overtime present" placeholder gets the real status; a system ABSENT mark is corrected to LATE.
+    const next = existing.status === 'OVERTIME' ? status : 'LATE';
     const rec = await Attendance.findOneAndUpdate(
       { _id: existing._id, entryTime: null },
-      { $set: { entryTime: now, status: 'LATE', source: 'CLOCK' } },
+      { $set: { entryTime: now, status: next, source: 'CLOCK' } },
       { new: true }
     );
     if (!rec) throw new AppError('You’ve already clocked in for this shift.', 409, 'ALREADY_CLOCKED_IN');
-    await activity.log(user._id, 'CLOCK_IN', 'Attendance', rec._id, `${user.name} clocked in`, { date: key, status: 'LATE' });
+    await activity.log(user._id, 'CLOCK_IN', 'Attendance', rec._id, `${user.name} clocked in`, { date: key, status: next });
     return rec;
   }
 
@@ -115,25 +153,35 @@ async function clockIn(user, { override = false } = {}) {
 }
 
 async function clockOut(user, summary = '') {
+  const settings = await getSettings();
   const now = new Date();
-  const open = await Attendance.findOne({
-    userId: user._id, exitTime: null,
-    entryTime: { $gte: new Date(now.getTime() - 30 * HOUR) },
-  }).sort({ date: -1 });
+  await closeStale(user, settings, now);
+  const open = (await openSessions(user._id))[0];
   if (!open) {
-    const settings = await getSettings();
     const done = await Attendance.findOne({ userId: user._id, date: T.dateKey(now, settings.timezone), exitTime: { $ne: null } });
-    if (done) throw new AppError('You’ve already clocked out for this shift.', 409, 'ALREADY_CLOCKED_OUT');
-    throw new AppError('You haven’t clocked in yet.', 409, 'NOT_CLOCKED_IN');
+    if (done) throw new AppError('You’ve already clocked out.', 409, 'ALREADY_CLOCKED_OUT');
+    throw new AppError('You’re not clocked in. A session left open for more than 5 hours is closed automatically.', 409, 'NOT_CLOCKED_IN');
   }
   const minutes = Math.max(0, Math.round((now - open.entryTime) / 60000));
+
+  if (open.kind === 'MAIN') {
+    const rec = await Attendance.findOneAndUpdate(
+      { _id: open.rec._id, exitTime: null },
+      { $set: { exitTime: now, workingMinutes: minutes, workSummary: summary || '' } },
+      { new: true }
+    );
+    if (!rec) throw new AppError('You’ve already clocked out.', 409, 'ALREADY_CLOCKED_OUT');
+    await activity.log(user._id, 'CLOCK_OUT', 'Attendance', rec._id, `${user.name} clocked out`, { date: rec.date, workingMinutes: minutes, hasSummary: !!summary });
+    return rec;
+  }
+
   const rec = await Attendance.findOneAndUpdate(
-    { _id: open._id, exitTime: null },
-    { $set: { exitTime: now, workingMinutes: minutes, workSummary: summary || '' } },
+    { _id: open.rec._id, overtime: { $elemMatch: { _id: open.session._id, exitTime: null } } },
+    { $set: { 'overtime.$.exitTime': now, 'overtime.$.minutes': minutes, 'overtime.$.summary': summary || '' }, $inc: { overtimeMinutes: minutes } },
     { new: true }
   );
-  if (!rec) throw new AppError('You’ve already clocked out for this shift.', 409, 'ALREADY_CLOCKED_OUT');
-  await activity.log(user._id, 'CLOCK_OUT', 'Attendance', rec._id, `${user.name} clocked out`, { date: rec.date, workingMinutes: minutes, hasSummary: !!summary });
+  if (!rec) throw new AppError('You’ve already clocked out.', 409, 'ALREADY_CLOCKED_OUT');
+  await activity.log(user._id, 'CLOCK_OUT', 'Attendance', rec._id, `${user.name} finished overtime`, { date: rec.date, overtime: true, minutes, hasSummary: !!summary });
   return rec;
 }
 
@@ -148,34 +196,34 @@ async function today(user) {
   const win = S.currentWindow(now, shift, settings);
   const early = (settings.clockInEarlyMinutes ?? 60) * 60_000;
 
-  let rec = null;
-  if (win) {
-    rec = await Attendance.findOne({ userId: user._id, date: win.date }).lean();
-  } else {
-    // Between shifts: show today's record if there is one, otherwise the shift that just ended.
-    rec = await Attendance.findOne({ userId: user._id, date: todayK, entryTime: { $ne: null } }).lean();
-    if (!rec) {
-      const last = S.lastEndedWindow(now, shift, settings);
-      if (last) rec = await Attendance.findOne({ userId: user._id, date: last.date }).lean();
-    }
+  const day = win || S.dayFor(now, shift, tz);
+  let rec = await Attendance.findOne({ userId: user._id, date: day.date }).lean();
+  if (!win && !(rec && (rec.entryTime || (rec.overtime || []).length))) {
+    // Between shifts with nothing recorded yet: show the shift that just ended.
+    const last = S.lastEndedWindow(now, shift, settings);
+    if (last) rec = (await Attendance.findOne({ userId: user._id, date: last.date }).lean()) || rec;
   }
 
+  const open = (await openSessions(user._id))[0] || null;
   const show = win || S.upcomingWindow(now, shift, settings);
-  const dayKey = win ? win.date : todayK;
-  const alreadyIn = !!(rec && rec.entryTime);
-  const canClockIn = !alreadyIn && (!!win || !T.isWorkingDay(todayK, settings));
+  const mainDone = !!(rec && rec.entryTime);
+  // Clocking in is always possible. Inside the shift (and before the main clock-in) it is the main shift, otherwise overtime.
+  const mode = win && !mainDone ? 'MAIN' : 'OVERTIME';
 
   return {
-    date: dayKey,
+    date: day.date,
     record: rec,
-    state: stateOf(rec),
-    isWorkingDay: T.isWorkingDay(dayKey, settings),
+    state: open ? 'WORKING' : stateOf(rec),
+    isWorkingDay: T.isWorkingDay(day.date, settings),
+    openSession: open ? { kind: open.kind, entryTime: open.entryTime } : null,
+    overtime: { minutes: rec ? rec.overtimeMinutes || 0 : 0, sessions: rec ? rec.overtime || [] : [] },
     shift: {
       start: shift.start,
       end: shift.end,
       overnight: S.isOvernight(shift),
       inWindow: !!win,
-      canClockIn,
+      canClockIn: !open,
+      mode,
       startsAt: show ? show.startUtc : null,
       endsAt: show ? show.endUtc : null,
       opensAt: show ? new Date(show.startUtc.getTime() - early) : null,
@@ -198,16 +246,20 @@ async function monthView(userId, month) {
 }
 
 function computeStats(records) {
-  const c = { PRESENT: 0, LATE: 0, LEAVE: 0, ABSENT: 0, HALF_DAY: 0 };
-  let workSum = 0, workN = 0;
+  const c = { PRESENT: 0, LATE: 0, LEAVE: 0, ABSENT: 0, HALF_DAY: 0, OVERTIME: 0 };
+  let workSum = 0, workN = 0, overtimeMinutes = 0, overtimeDays = 0;
   for (const r of records) {
     c[r.status] = (c[r.status] || 0) + 1;
     if (r.workingMinutes) { workSum += r.workingMinutes; workN++; }
+    if (r.overtimeMinutes > 0 || r.status === 'OVERTIME') overtimeDays++;
+    overtimeMinutes += r.overtimeMinutes || 0;
   }
+  // "Overtime present" days are shown on the calendar but count neither for nor against the attendance rate.
   const attended = c.PRESENT + c.LATE + c.HALF_DAY;
   const denom = attended + c.ABSENT;
   return {
-    present: c.PRESENT, late: c.LATE, leave: c.LEAVE, absent: c.ABSENT, halfDay: c.HALF_DAY,
+    present: c.PRESENT, late: c.LATE, leave: c.LEAVE, absent: c.ABSENT, halfDay: c.HALF_DAY, overtimePresent: c.OVERTIME,
+    overtimeDays, overtimeMinutes,
     attendanceRate: denom ? Math.round((attended / denom) * 1000) / 10 : null,
     avgWorkingMinutes: workN ? Math.round(workSum / workN) : 0,
   };
@@ -244,6 +296,7 @@ async function team(date) {
 }
 
 // Mark missing working days as ABSENT once each person's own shift is over (and catch up on recent days).
+// A day that already has an "overtime present" record is left alone.
 async function processAbsent(now = new Date()) {
   const settings = await getSettings();
   const tz = settings.timezone;

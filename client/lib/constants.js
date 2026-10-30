@@ -30,6 +30,7 @@ export const ATTENDANCE_META = {
   LEAVE: { label: 'Leave', tone: 'info' },
   ABSENT: { label: 'Absent', tone: 'danger' },
   HALF_DAY: { label: 'Half day', tone: 'accent' },
+  OVERTIME: { label: 'Overtime present', tone: 'overtime' },
 };
 
 export const PRESENCE_META = {
@@ -60,18 +61,19 @@ export const TONE = {
   warning: { text: 'text-warning', bg: 'bg-warning/12', ring: 'ring-warning/30', solid: 'bg-warning', border: 'border-warning/30' },
   info: { text: 'text-info', bg: 'bg-info/12', ring: 'ring-info/30', solid: 'bg-info', border: 'border-info/30' },
   accent: { text: 'text-accent', bg: 'bg-accent/12', ring: 'ring-accent/30', solid: 'bg-accent', border: 'border-accent/30' },
+  // Light green: counted as present for the day, but not an official on-time present.
+  overtime: { text: 'text-success/70', bg: 'bg-success/[0.07]', ring: 'ring-success/20', solid: 'bg-success/40', border: 'border-success/20' },
   muted: { text: 'text-muted', bg: 'bg-muted/12', ring: 'ring-muted/30', solid: 'bg-muted', border: 'border-muted/30' },
 };
 
 export const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
   { href: '/tasks/my', label: 'My Tasks', icon: 'mine' },
-  { href: '/tasks/team', label: 'All Tasks', icon: 'team' },
-  { href: '/attendance', label: 'Attendance', icon: 'clock' },
+  { href: '/tasks/team', label: 'Team Tasks', icon: 'team' },
   { href: '/projects', label: 'Projects', icon: 'folder' },
   { href: '/leaderboard', label: 'Leaderboard', icon: 'trophy' },
   { href: '/meetings', label: 'Meetings', icon: 'meeting' },
-  
+  { href: '/attendance', label: 'Attendance', icon: 'clock' },
   { href: '/leave', label: 'Leave', icon: 'leave' },
   { href: '/activity', label: 'Activity', icon: 'activity' },
   { href: '/profile', label: 'Profile', icon: 'profile' },

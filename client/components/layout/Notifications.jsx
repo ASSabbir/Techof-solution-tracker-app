@@ -14,7 +14,7 @@ import { EmptyState } from '@/components/ui/primitives';
 
 const ICON = {
   TASK_ASSIGNED: 'mine', TASK_REMINDER: 'timer', TASK_OVERDUE: 'warning', EXTENSION_REQUESTED: 'hourglass',
-  EXTENSION_APPROVED: 'ok', EXTENSION_REJECTED: 'no', TASK_COMPLETED: 'check', TASK_CANCELLED: 'ban',
+  EXTENSION_APPROVED: 'ok', EXTENSION_REJECTED: 'no', TASK_COMPLETED: 'check', TASK_CANCELLED: 'ban', TASK_REOPENED: 'refresh',
   LEAVE_SUBMITTED: 'leave', LEAVE_APPROVED: 'ok', LEAVE_REJECTED: 'no',
   MEETING_ANNOUNCED: 'meetingAdd', MEETING_RESPONSIBLE: 'project', MEETING_UPDATED: 'meeting', MEETING_RSVP: 'going',
   MEETING_CANCELLED: 'ban', MEETING_REMINDER: 'timer',

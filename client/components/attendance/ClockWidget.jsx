@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { api } from '@/lib/api';
 import { useServerNow } from '@/lib/clock';
-import { fmtDeadline, fmtTime, fmtWorked } from '@/lib/format';
+import { fmtTime, fmtWorked } from '@/lib/format';
 import { shiftRange } from '@/lib/shift';
 import { useAction, useAttendanceToday } from '@/hooks/queries';
 import { useToast, useUI } from '@/components/contexts';
@@ -19,9 +19,9 @@ export default function ClockWidget({ compact = false }) {
   const [outOpen, setOutOpen] = useState(false);
   const [summary, setSummary] = useState('');
 
-  const clockIn = useAction((override) => api('/attendance/clock-in', { method: 'POST', body: { override } }), { success: 'Clocked in. Have a productive shift!', silentError: true, sound: 'clockin' });
+  const clockIn = useAction((override) => api('/attendance/clock-in', { method: 'POST', body: { override } }), { success: 'Clocked in. Have a productive session!', silentError: true, sound: 'clockin' });
   const clockOut = useAction((text) => api('/attendance/clock-out', { method: 'POST', body: { summary: text } }), {
-    success: 'Clocked out. Nice work today!',
+    success: 'Clocked out. Nice work!',
     sound: 'clockout',
     onSuccess: () => { setOutOpen(false); setSummary(''); },
   });
@@ -43,22 +43,29 @@ export default function ClockWidget({ compact = false }) {
 
   const rec = data?.record;
   const shift = data?.shift;
+  const session = data?.openSession;
   const working = data?.state === 'WORKING';
+  const overtimeRunning = working && session?.kind === 'OVERTIME';
   const done = data?.state === 'COMPLETED';
   const onLeave = data?.state === 'LEAVE';
-  const minutes = working ? Math.max(0, Math.floor((now - new Date(rec.entryTime).getTime()) / 60000)) : rec?.workingMinutes || 0;
+  const startMs = session ? new Date(session.entryTime).getTime() : null;
+  const minutes = working ? Math.max(0, Math.floor((now - startMs) / 60000)) : rec?.workingMinutes || 0;
   const busy = clockIn.isPending || clockOut.isPending;
   const canIn = !!shift?.canClockIn;
+  const overtimeMode = shift?.mode === 'OVERTIME';
+  const otTotal = (data?.overtime?.minutes || 0) + (overtimeRunning ? minutes : 0);
+  const entryShown = working ? session.entryTime : rec?.entryTime;
 
   return (
     <div className="card card-pad relative overflow-hidden" data-anim>
       <div className="flex items-center justify-between">
         <p className="eyebrow">Attendance</p>
-        {working && <Badge tone="success" dot>Working</Badge>}
-        {done && <Badge tone="info" dot>Completed</Badge>}
-        {onLeave && <Badge tone="info" dot>On leave</Badge>}
-        {data?.state === 'ABSENT' && <Badge tone="danger" dot>Absent</Badge>}
-        {data?.state === 'NOT_STARTED' && <Badge tone="muted" dot>Not started</Badge>}
+        {working && (overtimeRunning ? <Badge tone="overtime" dot>Overtime</Badge> : <Badge tone="success" dot>Working</Badge>)}
+        {!working && done && <Badge tone="info" dot>Completed</Badge>}
+        {!working && onLeave && <Badge tone="accent" dot>On leave</Badge>}
+        {!working && data?.state === 'OVERTIME' && <Badge tone="overtime" dot>Overtime present</Badge>}
+        {!working && data?.state === 'ABSENT' && <Badge tone="danger" dot>Absent</Badge>}
+        {!working && data?.state === 'NOT_STARTED' && <Badge tone="muted" dot>Not started</Badge>}
       </div>
 
       {shift && (
@@ -69,32 +76,39 @@ export default function ClockWidget({ compact = false }) {
       )}
 
       <div className={compact ? 'mt-4 grid grid-cols-3 gap-3' : 'mt-5 grid grid-cols-3 gap-4'}>
-        <div><p className="text-xs text-muted">Entry</p><p className="digit mt-1 text-lg font-extrabold">{fmtTime(rec?.entryTime)}</p></div>
-        <div><p className="text-xs text-muted">{done ? 'Exit' : 'Status'}</p><p className="mt-1 text-lg font-extrabold">{done ? <span className="digit">{fmtTime(rec?.exitTime)}</span> : rec?.status ? ATTENDANCE_META[rec.status]?.label : '—'}</p></div>
-        <div><p className="text-xs text-muted">Duration</p><p className="digit mt-1 text-lg font-extrabold">{rec?.entryTime ? fmtWorked(minutes) : '—'}</p></div>
+        <div><p className="text-xs text-muted">{overtimeRunning ? 'Overtime in' : 'Entry'}</p><p className="digit mt-1 text-lg font-extrabold">{fmtTime(entryShown)}</p></div>
+        <div><p className="text-xs text-muted">{done && !working ? 'Exit' : 'Status'}</p><p className="mt-1 text-lg font-extrabold">{done && !working ? <span className="digit">{fmtTime(rec?.exitTime)}</span> : working ? (overtimeRunning ? 'Overtime' : ATTENDANCE_META[rec?.status]?.label || '—') : rec?.status ? ATTENDANCE_META[rec.status]?.label : '—'}</p></div>
+        <div><p className="text-xs text-muted">{overtimeRunning ? 'This session' : 'Duration'}</p><p className="digit mt-1 text-lg font-extrabold">{working || rec?.entryTime ? fmtWorked(minutes) : '—'}</p></div>
       </div>
 
-      <div className="mt-5">
-        {!rec?.entryTime && !done && (
+      {otTotal > 0 && (
+        <p className="mt-4 flex items-center gap-2 rounded-xl bg-success/[0.08] px-3.5 py-2 text-xs font-bold text-success/80">
+          <Icon name="zap" className="h-3.5 w-3.5" />Overtime for this day: {fmtWorked(otTotal)}
+        </p>
+      )}
+
+      <div className="mt-5 space-y-2.5">
+        {working && (
+          <button onClick={() => setOutOpen(true)} disabled={busy} className="btn-soft w-full hover:!border-danger/50 hover:!bg-danger/10"><Icon name="logout" />{overtimeRunning ? 'End Overtime' : 'Clock Out'}</button>
+        )}
+        {!working && done && <p className="rounded-xl bg-success/10 px-4 py-2.5 text-center text-sm font-semibold text-success">Shift done — {fmtWorked(rec.workingMinutes)} logged{rec.autoClosed ? ' (closed automatically at shift end)' : ''}.</p>}
+        {!working && canIn && (
           <>
-            <button onClick={doClockIn} disabled={busy || !canIn} className="btn-primary w-full">{busy ? <Spinner /> : <Icon name="login" />}{clockIn.isPending ? 'Clocking in…' : 'Clock In'}</button>
-            {!canIn && shift?.opensAt && <p className="mt-2.5 text-center text-xs font-semibold text-muted">Clock-in opens {fmtDeadline(shift.opensAt, now).replace(/^Today, /, 'at ')}</p>}
+            <button onClick={doClockIn} disabled={busy} className={overtimeMode ? 'btn-soft w-full' : 'btn-primary w-full'}>{busy ? <Spinner /> : <Icon name={overtimeMode ? 'zap' : 'login'} />}{clockIn.isPending ? 'Clocking in…' : overtimeMode ? 'Clock In · Overtime' : 'Clock In'}</button>
+            {overtimeMode && <p className="text-center text-xs font-semibold text-muted">Outside your shift — this counts as overtime. You can clock in any time of day.</p>}
           </>
         )}
-        {working && (
-          <button onClick={() => setOutOpen(true)} disabled={busy} className="btn-soft w-full hover:!border-danger/50 hover:!bg-danger/10"><Icon name="logout" />Clock Out</button>
-        )}
-        {done && <p className="rounded-xl bg-success/10 px-4 py-2.5 text-center text-sm font-semibold text-success">You’re done — {fmtWorked(rec.workingMinutes)} logged{rec.autoClosed ? ' (closed automatically at shift end)' : ''}.</p>}
+        {working && <p className="text-center text-[11px] font-semibold text-muted">Forgot to clock out? It closes by itself after 5 hours.</p>}
       </div>
 
-      <Modal open={outOpen} onClose={() => !clockOut.isPending && setOutOpen(false)} title="Clock out" subtitle="Add a short note about what you worked on. It shows in your attendance details." size="md"
+      <Modal open={outOpen} onClose={() => !clockOut.isPending && setOutOpen(false)} title={overtimeRunning ? 'End overtime' : 'Clock out'} subtitle="Add a short note about what you worked on. It shows in your attendance details." size="md"
         footer={(
           <>
             <button className="btn-ghost" onClick={() => setOutOpen(false)} disabled={clockOut.isPending}>Cancel</button>
-            <button className="btn-primary" onClick={() => clockOut.mutate(summary.trim())} disabled={clockOut.isPending}>{clockOut.isPending ? <><Spinner />Clocking out…</> : <><Icon name="logout" />Clock Out</>}</button>
+            <button className="btn-primary" onClick={() => clockOut.mutate(summary.trim())} disabled={clockOut.isPending}>{clockOut.isPending ? <><Spinner />Clocking out…</> : <><Icon name="logout" />{overtimeRunning ? 'End Overtime' : 'Clock Out'}</>}</button>
           </>
         )}>
-        <Field label="What did you do today? (optional)" hint={`${summary.length}/500`}>
+        <Field label="What did you do? (optional)" hint={`${summary.length}/500`}>
           <textarea className="input min-h-[110px] resize-y" maxLength={500} autoFocus value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Finished the homepage animations, fixed the login bug…" />
         </Field>
       </Modal>

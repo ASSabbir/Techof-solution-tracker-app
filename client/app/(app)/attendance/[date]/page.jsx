@@ -25,7 +25,7 @@ export default function AttendanceDayPage() {
               <div key={r.user._id} className="card card-pad" data-anim>
                 <div className="flex items-center gap-3"><Avatar user={r.user} size="md" /><p className="flex-1 font-extrabold">{r.user.name}</p>{meta ? <Badge tone={meta.tone}>{meta.label}</Badge> : <Badge tone="muted">No record</Badge>}</div>
                 <dl className="mt-5 divide-y divide-line/70 text-sm">
-                  {[['Entry', fmtTime(r.record?.entryTime)], ['Exit', fmtTime(r.record?.exitTime)], ['Working', r.record?.workingMinutes ? fmtWorked(r.record.workingMinutes) : '—']].map(([k, v]) => <div key={k} className="flex justify-between py-2.5"><dt className="text-muted">{k}</dt><dd className="digit font-bold">{v}</dd></div>)}
+                  {[['Entry', fmtTime(r.record?.entryTime)], ['Exit', fmtTime(r.record?.exitTime)], ['Working', r.record?.workingMinutes ? fmtWorked(r.record.workingMinutes) : '—'], ...(r.record?.overtimeMinutes ? [['Overtime', fmtWorked(r.record.overtimeMinutes)]] : [])].map(([k, v]) => <div key={k} className="flex justify-between py-2.5"><dt className="text-muted">{k}</dt><dd className="digit font-bold">{v}</dd></div>)}
                   {r.record?.note && <div className="flex justify-between gap-3 py-2.5"><dt className="text-muted">Reason</dt><dd className="text-right font-semibold">{r.record.note}</dd></div>}
                 </dl>
               </div>

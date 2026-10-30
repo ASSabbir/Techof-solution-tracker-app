@@ -45,6 +45,19 @@ function upcomingWindow(now, shift, settings) {
   return open[0] || null;
 }
 
+// Which attendance date a moment belongs to: each date owns the 24 hours that END when its shift ends.
+// So evening work the day before a 1 AM shift counts toward that shift's date. Returns that date's window.
+function dayFor(at, shift, tz) {
+  const t = at.getTime();
+  const todayK = T.dateKey(at, tz);
+  for (const n of [-1, 0, 1, 2]) {
+    const w = windowFor(T.addDaysKey(todayK, n), shift, tz);
+    const end = w.endUtc.getTime();
+    if (t > end - 24 * 3600_000 && t <= end) return w;
+  }
+  return windowFor(todayK, shift, tz);
+}
+
 function hhmm12(hhmm) {
   const [h, m] = String(hhmm).split(':').map(Number);
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
@@ -54,4 +67,4 @@ function fmtInstant(date, tz) {
   return new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }).format(date);
 }
 
-module.exports = { userShift, isOvernight, windowFor, windows, currentWindow, lastEndedWindow, upcomingWindow, hhmm12, fmtInstant };
+module.exports = { userShift, isOvernight, windowFor, windows, currentWindow, lastEndedWindow, upcomingWindow, dayFor, hhmm12, fmtInstant };

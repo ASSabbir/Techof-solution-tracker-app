@@ -2,7 +2,7 @@ const Project = require('../models/Project');
 const Task = require('../models/Task');
 const User = require('../models/User');
 const AppError = require('../utils/AppError');
-const { OPEN_STATUSES, USER_FIELDS, CLOSED_PROJECT_STATUSES } = require('../utils/constants');
+const { OPEN_STATUSES, USER_FIELDS } = require('../utils/constants');
 const { notify } = require('./notification.service');
 const activity = require('./activity.service');
 
@@ -177,11 +177,11 @@ async function update(user, id, patch) {
   return getOne(user, p._id);
 }
 
-/* Used by tasks: returns the project if tasks may be added to it, otherwise throws. */
+/* Used by tasks: returns the project if tasks may be added to it, otherwise throws. Live and archived projects are fine; only completed ones are closed. */
 async function assertOpenForTasks(projectId) {
   const p = await Project.findById(projectId).select('name status').lean();
   if (!p) throw new AppError('Please choose a valid project.', 400);
-  if (CLOSED_PROJECT_STATUSES.includes(p.status)) throw new AppError(`“${p.name}” is ${p.status === 'COMPLETED' ? 'completed' : 'archived'}. Reopen it first to add tasks.`, 409);
+  if (p.status === 'COMPLETED') throw new AppError(`“${p.name}” is completed. Reopen it first to add tasks.`, 409);
   return p;
 }
 
